@@ -43,7 +43,7 @@ async function nextBeta (v) {
 }
 
 async function getElectronVersion () {
-  const versionPath = path.join(__dirname, '..', '..', 'VERSION')
+  const versionPath = path.join(__dirname, '..', '..', 'ELECTRON_VERSION')
   const version = await readFile(versionPath, 'utf8')
   return version.trim()
 }
