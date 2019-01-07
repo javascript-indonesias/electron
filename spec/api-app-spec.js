@@ -6,6 +6,7 @@ const https = require('https')
 const net = require('net')
 const fs = require('fs')
 const path = require('path')
+const cp = require('child_process')
 const { ipcRenderer, remote } = require('electron')
 const { emittedOnce } = require('./events-helpers')
 const { closeWindow } = require('./window-helpers')
@@ -32,7 +33,10 @@ describe('electron module', () => {
       window = new BrowserWindow({
         show: false,
         width: 400,
-        height: 400
+        height: 400,
+        webPreferences: {
+          nodeIntegration: true
+        }
       })
     })
 
@@ -298,7 +302,12 @@ describe('app module', () => {
         password: 'electron'
       }
 
-      w = new BrowserWindow({ show: false })
+      w = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: true
+        }
+      })
 
       w.webContents.on('did-finish-load', () => {
         expect(w.webContents.getTitle()).to.equal('authorized')
@@ -375,7 +384,12 @@ describe('app module', () => {
         expect(webContents).to.equal(w.webContents)
         done()
       })
-      w = new BrowserWindow({ show: false })
+      w = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: true
+        }
+      })
       w.loadURL('about:blank')
       w.webContents.executeJavaScript(`require('electron').desktopCapturer.getSources({ types: ['screen'] }, () => {})`)
     })
@@ -386,7 +400,12 @@ describe('app module', () => {
         expect(moduleName).to.equal('test')
         done()
       })
-      w = new BrowserWindow({ show: false })
+      w = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: true
+        }
+      })
       w.loadURL('about:blank')
       w.webContents.executeJavaScript(`require('electron').remote.require('test')`)
     })
@@ -397,7 +416,12 @@ describe('app module', () => {
         expect(globalName).to.equal('test')
         done()
       })
-      w = new BrowserWindow({ show: false })
+      w = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: true
+        }
+      })
       w.loadURL('about:blank')
       w.webContents.executeJavaScript(`require('electron').remote.getGlobal('test')`)
     })
@@ -590,6 +614,7 @@ describe('app module', () => {
       w = new BrowserWindow({
         show: false,
         webPreferences: {
+          nodeIntegration: true,
           partition: 'empty-certificate'
         }
       })
@@ -1091,4 +1116,73 @@ describe('app module', () => {
       return expect(app.whenReady()).to.be.eventually.fulfilled
     })
   })
+
+  describe('commandLine.hasSwitch', () => {
+    it('returns true when present', () => {
+      app.commandLine.appendSwitch('foobar1')
+      expect(app.commandLine.hasSwitch('foobar1')).to.be.true()
+    })
+
+    it('returns false when not present', () => {
+      expect(app.commandLine.hasSwitch('foobar2')).to.be.false()
+    })
+  })
+
+  describe('commandLine.hasSwitch (existing argv)', () => {
+    it('returns true when present', async () => {
+      const { hasSwitch } = await runCommandLineTestApp('--foobar')
+      expect(hasSwitch).to.be.true()
+    })
+
+    it('returns false when not present', async () => {
+      const { hasSwitch } = await runCommandLineTestApp()
+      expect(hasSwitch).to.be.false()
+    })
+  })
+
+  describe('commandLine.getSwitchValue', () => {
+    it('returns the value when present', () => {
+      app.commandLine.appendSwitch('foobar', 'æøåü')
+      expect(app.commandLine.getSwitchValue('foobar')).to.equal('æøåü')
+    })
+
+    it('returns an empty string when present without value', () => {
+      app.commandLine.appendSwitch('foobar1')
+      expect(app.commandLine.getSwitchValue('foobar1')).to.equal('')
+    })
+
+    it('returns an empty string when not present', () => {
+      expect(app.commandLine.getSwitchValue('foobar2')).to.equal('')
+    })
+  })
+
+  describe('commandLine.getSwitchValue (existing argv)', () => {
+    it('returns the value when present', async () => {
+      const { getSwitchValue } = await runCommandLineTestApp('--foobar=test')
+      expect(getSwitchValue).to.equal('test')
+    })
+
+    it('returns an empty string when present without value', async () => {
+      const { getSwitchValue } = await runCommandLineTestApp('--foobar')
+      expect(getSwitchValue).to.equal('')
+    })
+
+    it('returns an empty string when not present', async () => {
+      const { getSwitchValue } = await runCommandLineTestApp()
+      expect(getSwitchValue).to.equal('')
+    })
+  })
+
+  async function runCommandLineTestApp (...args) {
+    const appPath = path.join(__dirname, 'fixtures', 'api', 'command-line')
+    const electronPath = remote.getGlobal('process').execPath
+    const appProcess = cp.spawn(electronPath, [appPath, ...args])
+
+    let output = ''
+    appProcess.stdout.on('data', (data) => { output += data })
+
+    await emittedOnce(appProcess.stdout, 'end')
+
+    return JSON.parse(output)
+  }
 })
