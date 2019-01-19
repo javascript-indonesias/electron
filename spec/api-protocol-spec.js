@@ -656,43 +656,60 @@ describe('protocol module', () => {
     })
   })
 
-  describe('protocol.isProtocolHandled', () => {
-    it('returns true for about:', (done) => {
+  describe('protocol.isProtocolHandled', (done) => {
+    it('returns true for about:', async () => {
+      const result = await protocol.isProtocolHandled('about')
+      assert.strictEqual(result, true)
+    })
+
+    // TODO(codebytere): remove when promisification is complete
+    it('returns true for about: (callback)', () => {
       protocol.isProtocolHandled('about', (result) => {
         assert.strictEqual(result, true)
         done()
       })
     })
 
-    it('returns true for file:', (done) => {
+    it('returns true for file:', async () => {
+      const result = await protocol.isProtocolHandled('file')
+      assert.strictEqual(result, true)
+    })
+
+    // TODO(codebytere): remove when promisification is complete
+    it('returns true for file: (callback)', () => {
       protocol.isProtocolHandled('file', (result) => {
         assert.strictEqual(result, true)
         done()
       })
     })
 
-    it('returns true for http:', (done) => {
-      protocol.isProtocolHandled('http', (result) => {
+    it('returns true for http:', async () => {
+      const result = await protocol.isProtocolHandled('http')
+      assert.strictEqual(result, true)
+    })
+
+    it('returns true for https:', async () => {
+      const result = await protocol.isProtocolHandled('https')
+      assert.strictEqual(result, true)
+    })
+
+    it('returns false when scheme is not registered', async () => {
+      const result = await protocol.isProtocolHandled('no-exist')
+      assert.strictEqual(result, false)
+    })
+
+    it('returns true for custom protocol', () => {
+      const emptyHandler = (request, callback) => callback()
+      protocol.registerStringProtocol(protocolName, emptyHandler, async (error) => {
+        assert.strictEqual(error, null)
+        const result = await protocol.isProtocolHandled(protocolName)
         assert.strictEqual(result, true)
         done()
       })
     })
 
-    it('returns true for https:', (done) => {
-      protocol.isProtocolHandled('https', (result) => {
-        assert.strictEqual(result, true)
-        done()
-      })
-    })
-
-    it('returns false when scheme is not registered', (done) => {
-      protocol.isProtocolHandled('no-exist', (result) => {
-        assert.strictEqual(result, false)
-        done()
-      })
-    })
-
-    it('returns true for custom protocol', (done) => {
+    // TODO(codebytere): remove when promisification is complete
+    it('returns true for custom protocol (callback)', () => {
       const emptyHandler = (request, callback) => callback()
       protocol.registerStringProtocol(protocolName, emptyHandler, (error) => {
         assert.strictEqual(error, null)
@@ -703,7 +720,18 @@ describe('protocol module', () => {
       })
     })
 
-    it('returns true for intercepted protocol', (done) => {
+    it('returns true for intercepted protocol', () => {
+      const emptyHandler = (request, callback) => callback()
+      protocol.interceptStringProtocol('http', emptyHandler, async (error) => {
+        assert.strictEqual(error, null)
+        const result = await protocol.isProtocolHandled('http')
+        assert.strictEqual(result, true)
+        done()
+      })
+    })
+
+    // TODO(codebytere): remove when promisification is complete
+    it('returns true for intercepted protocol (callback)', () => {
       const emptyHandler = (request, callback) => callback()
       protocol.interceptStringProtocol('http', emptyHandler, (error) => {
         assert.strictEqual(error, null)
