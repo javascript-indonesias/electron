@@ -10,9 +10,9 @@ gclient_gn_args = [
 
 vars = {
   'chromium_version':
-    '71.0.3578.98',
+    '72.0.3626.52',
   'node_version':
-    'aeae08cda811ed122918bfd48fd9e56f8204d818',
+    'ad2c89ec3be0f5db3ea02b0f591d36a5d84c51ad',
 
   'boto_version': 'f7574aa6cc2c819430c1f05e9a1a1a666ef8169b',
   'pyyaml_version': '3.12',
@@ -107,7 +107,7 @@ hooks = [
     'action': [
       'python',
       '-c',
-      'import os; os.chdir("src"); os.chdir("electron"); os.system("npm install")',
+      'import os, subprocess; os.chdir(os.path.join("src", "electron")); subprocess.check_call(["python", "script/lib/npm.py", "install"]);',
     ],
   },
   {
@@ -117,7 +117,7 @@ hooks = [
     'action': [
       'python',
       '-c',
-      'import os; os.chdir("src"); os.chdir("electron"); os.chdir("vendor"); os.chdir("boto"); os.system("python setup.py build");',
+      'import os, subprocess; os.chdir(os.path.join("src", "electron", "vendor", "boto")); subprocess.check_call(["python", "setup.py", "build"]);',
     ],
   },
   {
@@ -127,9 +127,9 @@ hooks = [
     'action': [
       'python',
       '-c',
-      'import os; os.chdir("src"); os.chdir("electron"); os.chdir("vendor"); os.chdir("requests"); os.system("python setup.py build");',
+      'import os, subprocess; os.chdir(os.path.join("src", "electron", "vendor", "requests")); subprocess.check_call(["python", "setup.py", "build"]);',
     ],
-  }
+  },
 ]
 
 recursedeps = [

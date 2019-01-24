@@ -73,6 +73,29 @@ bool GetAsInteger(const base::Value* val,
   return false;
 }
 
+bool GetAsAutoplayPolicy(const base::Value* val,
+                         const base::StringPiece& path,
+                         content::AutoplayPolicy* out) {
+  std::string policy_str;
+  if (GetAsString(val, path, &policy_str)) {
+    if (policy_str == "no-user-gesture-required") {
+      *out = content::AutoplayPolicy::kNoUserGestureRequired;
+      return true;
+    } else if (policy_str == "user-gesture-required") {
+      *out = content::AutoplayPolicy::kUserGestureRequired;
+      return true;
+    } else if (policy_str == "user-gesture-required-for-cross-origin") {
+      *out = content::AutoplayPolicy::kUserGestureRequiredForCrossOrigin;
+      return true;
+    } else if (policy_str == "document-user-activation-required") {
+      *out = content::AutoplayPolicy::kDocumentUserActivationRequired;
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 }  // namespace
 
 namespace atom {
@@ -100,6 +123,7 @@ WebContentsPreferences::WebContentsPreferences(
   SetDefaultBoolIfUndefined(options::kPlugins, false);
   SetDefaultBoolIfUndefined(options::kExperimentalFeatures, false);
   SetDefaultBoolIfUndefined(options::kNodeIntegration, false);
+  SetDefaultBoolIfUndefined(options::kNodeIntegrationInSubFrames, false);
   SetDefaultBoolIfUndefined(options::kNodeIntegrationInWorker, false);
   SetDefaultBoolIfUndefined(options::kWebviewTag, false);
   SetDefaultBoolIfUndefined(options::kSandbox, false);
@@ -346,6 +370,9 @@ void WebContentsPreferences::AppendCommandLineSwitches(
     }
   }
 
+  if (IsEnabled(options::kNodeIntegrationInSubFrames))
+    command_line->AppendSwitch(switches::kNodeIntegrationInSubFrames);
+
   // We are appending args to a webContents so let's save the current state
   // of our preferences object so that during the lifetime of the WebContents
   // we can fetch the options used to initally configure the WebContents
@@ -360,6 +387,10 @@ void WebContentsPreferences::OverrideWebkitPrefs(
       IsEnabled("textAreasAreResizable", true /* default_value */);
   prefs->navigate_on_drag_drop =
       IsEnabled("navigateOnDragDrop", false /* default_value */);
+  if (!GetAsAutoplayPolicy(&preference_, "autoplayPolicy",
+                           &prefs->autoplay_policy)) {
+    prefs->autoplay_policy = content::AutoplayPolicy::kNoUserGestureRequired;
+  }
 
   // Check if webgl should be enabled.
   bool is_webgl_enabled = IsEnabled("webgl", true /* default_value */);

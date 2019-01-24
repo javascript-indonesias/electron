@@ -8,6 +8,10 @@
 #include <memory>
 #include <string>
 
+#if defined(OS_LINUX)
+#include <glib.h>  // for g_setenv()
+#endif
+
 #include "atom/app/atom_content_client.h"
 #include "atom/browser/atom_browser_client.h"
 #include "atom/browser/relauncher.h"
@@ -182,6 +186,36 @@ bool AtomMainDelegate::BasicStartupComplete(int* exit_code) {
   return false;
 }
 
+void AtomMainDelegate::PostEarlyInitialization(bool is_running_tests) {
+  std::string custom_locale;
+  ui::ResourceBundle::InitSharedInstanceWithLocale(
+      custom_locale, nullptr, ui::ResourceBundle::LOAD_COMMON_RESOURCES);
+  auto* cmd_line = base::CommandLine::ForCurrentProcess();
+  if (cmd_line->HasSwitch(::switches::kLang)) {
+    const std::string locale = cmd_line->GetSwitchValueASCII(::switches::kLang);
+    const base::FilePath locale_file_path =
+        ui::ResourceBundle::GetSharedInstance().GetLocaleFilePath(locale, true);
+    if (!locale_file_path.empty()) {
+      custom_locale = locale;
+#if defined(OS_LINUX)
+      /* When built with USE_GLIB, libcc's GetApplicationLocaleInternal() uses
+       * glib's g_get_language_names(), which keys off of getenv("LC_ALL") */
+      g_setenv("LC_ALL", custom_locale.c_str(), TRUE);
+#endif
+    }
+  }
+
+#if defined(OS_MACOSX)
+  if (custom_locale.empty())
+    l10n_util::OverrideLocaleWithCocoaLocale();
+#endif
+
+  LoadResourceBundle(custom_locale);
+
+  AtomBrowserClient::SetApplicationLocale(
+      l10n_util::GetApplicationLocale(custom_locale));
+}
+
 void AtomMainDelegate::PreSandboxStartup() {
   auto* command_line = base::CommandLine::ForCurrentProcess();
 
@@ -203,12 +237,6 @@ void AtomMainDelegate::PreSandboxStartup() {
   // Disable setuid sandbox since it is not longer required on
   // linux (namespace sandbox is available on most distros).
   command_line->AppendSwitch(service_manager::switches::kDisableSetuidSandbox);
-
-  if (!command_line->HasSwitch(switches::kEnableMixedSandbox) &&
-      !command_line->HasSwitch(switches::kEnableSandbox)) {
-    // Disable renderer sandbox for most of node's functions.
-    command_line->AppendSwitch(service_manager::switches::kNoSandbox);
-  }
 
   // Allow file:// URIs to read other file:// URIs by default.
   command_line->AppendSwitch(::switches::kAllowFileAccessFromFiles);

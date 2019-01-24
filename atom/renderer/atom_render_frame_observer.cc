@@ -187,7 +187,7 @@ void AtomRenderFrameObserver::OnBrowserMessage(bool internal,
     return;
 
   blink::WebLocalFrame* frame = render_frame_->GetWebFrame();
-  if (!frame || !render_frame_->IsMainFrame())
+  if (!frame)
     return;
 
   EmitIPCEvent(frame, internal, channel, args, sender_id);
@@ -212,11 +212,10 @@ void AtomRenderFrameObserver::OnTakeHeapSnapshot(
   bool success = TakeHeapSnapshot(blink::MainThreadIsolate(), &file);
 
   base::ListValue args;
-  args.AppendString(channel);
   args.AppendBoolean(success);
 
   render_frame_->Send(new AtomFrameHostMsg_Message(
-      render_frame_->GetRoutingID(), "ipc-message", args));
+      render_frame_->GetRoutingID(), true, channel, args));
 }
 
 void AtomRenderFrameObserver::EmitIPCEvent(blink::WebLocalFrame* frame,

@@ -19,7 +19,8 @@ class AtomSandboxedRendererClient : public RendererClientBase {
   ~AtomSandboxedRendererClient() override;
 
   void InitializeBindings(v8::Local<v8::Object> binding,
-                          v8::Local<v8::Context> context);
+                          v8::Local<v8::Context> context,
+                          bool is_main_frame);
   void InvokeIpcCallback(v8::Handle<v8::Context> context,
                          const std::string& callback_name,
                          std::vector<v8::Handle<v8::Value>> args);
@@ -29,7 +30,7 @@ class AtomSandboxedRendererClient : public RendererClientBase {
   void WillReleaseScriptContext(v8::Handle<v8::Context> context,
                                 content::RenderFrame* render_frame) override;
   void SetupMainWorldOverrides(v8::Handle<v8::Context> context,
-                               content::RenderFrame* render_frame) override {}
+                               content::RenderFrame* render_frame) override;
   // content::ContentRendererClient:
   void RenderFrameCreated(content::RenderFrame*) override;
   void RenderViewCreated(content::RenderView*) override;

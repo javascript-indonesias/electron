@@ -11,7 +11,6 @@
 #include "atom/common/native_mate_converters/value_converter.h"
 #include "atom/common/node_bindings.h"
 #include "atom/common/options_switches.h"
-#include "atom/renderer/api/atom_api_renderer_ipc.h"
 #include "atom/renderer/atom_render_frame_observer.h"
 #include "base/base_paths.h"
 #include "base/command_line.h"
@@ -115,11 +114,12 @@ class AtomSandboxedRenderFrameObserver : public AtomRenderFrameObserver {
     auto context = renderer_client_->GetContext(frame, isolate);
     v8::Context::Scope context_scope(context);
 
-    v8::Local<v8::Value> argv[] = {mate::ConvertToV8(isolate, channel),
+    v8::Local<v8::Value> argv[] = {mate::ConvertToV8(isolate, internal),
+                                   mate::ConvertToV8(isolate, channel),
                                    mate::ConvertToV8(isolate, args),
                                    mate::ConvertToV8(isolate, sender_id)};
     renderer_client_->InvokeIpcCallback(
-        context, internal ? "onInternalMessage" : "onMessage",
+        context, "onMessage",
         std::vector<v8::Local<v8::Value>>(argv, argv + node::arraysize(argv)));
   }
 
@@ -140,7 +140,8 @@ AtomSandboxedRendererClient::~AtomSandboxedRendererClient() {}
 
 void AtomSandboxedRendererClient::InitializeBindings(
     v8::Local<v8::Object> binding,
-    v8::Local<v8::Context> context) {
+    v8::Local<v8::Context> context,
+    bool is_main_frame) {
   auto* isolate = context->GetIsolate();
   mate::Dictionary b(isolate, binding);
   b.SetMethod("get", GetBinding);
@@ -155,6 +156,7 @@ void AtomSandboxedRendererClient::InitializeBindings(
   process.SetReadOnly("pid", base::GetCurrentProcId());
   process.SetReadOnly("sandboxed", true);
   process.SetReadOnly("type", "renderer");
+  process.SetReadOnly("isMainFrame", is_main_frame);
 
   // Pass in CLI flags needed to setup the renderer
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
@@ -181,15 +183,23 @@ void AtomSandboxedRendererClient::DidCreateScriptContext(
 
   // Only allow preload for the main frame or
   // For devtools we still want to run the preload_bundle script
-  if (!render_frame->IsMainFrame() && !IsDevTools(render_frame) &&
-      !IsDevToolsExtension(render_frame))
+  // Or when nodeSupport is explicitly enabled in sub frames
+  bool is_main_frame = render_frame->IsMainFrame();
+  bool is_devtools =
+      IsDevTools(render_frame) || IsDevToolsExtension(render_frame);
+  bool allow_node_in_sub_frames =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kNodeIntegrationInSubFrames);
+  bool should_load_preload =
+      is_main_frame || is_devtools || allow_node_in_sub_frames;
+  if (!should_load_preload)
     return;
 
   // Wrap the bundle into a function that receives the binding object as
   // argument.
   auto* isolate = context->GetIsolate();
   auto binding = v8::Object::New(isolate);
-  InitializeBindings(binding, context);
+  InitializeBindings(binding, context, render_frame->IsMainFrame());
   AddRenderBindings(isolate, binding);
 
   std::vector<v8::Local<v8::String>> preload_bundle_params = {
@@ -202,11 +212,38 @@ void AtomSandboxedRendererClient::DidCreateScriptContext(
       &preload_bundle_params, &preload_bundle_args, nullptr);
 }
 
+void AtomSandboxedRendererClient::SetupMainWorldOverrides(
+    v8::Handle<v8::Context> context,
+    content::RenderFrame* render_frame) {
+  // Setup window overrides in the main world context
+  // Wrap the bundle into a function that receives the isolatedWorld as
+  // an argument.
+  auto* isolate = context->GetIsolate();
+
+  mate::Dictionary process = mate::Dictionary::CreateEmpty(isolate);
+  process.SetMethod("binding", GetBinding);
+
+  std::vector<v8::Local<v8::String>> isolated_bundle_params = {
+      node::FIXED_ONE_BYTE_STRING(isolate, "nodeProcess"),
+      node::FIXED_ONE_BYTE_STRING(isolate, "isolatedWorld")};
+
+  std::vector<v8::Local<v8::Value>> isolated_bundle_args = {
+      process.GetHandle(),
+      GetContext(render_frame->GetWebFrame(), isolate)->Global()};
+
+  node::per_process::native_module_loader.CompileAndCall(
+      context, "electron/js2c/isolated_bundle", &isolated_bundle_params,
+      &isolated_bundle_args, nullptr);
+}
+
 void AtomSandboxedRendererClient::WillReleaseScriptContext(
     v8::Handle<v8::Context> context,
     content::RenderFrame* render_frame) {
   // Only allow preload for the main frame
-  if (!render_frame->IsMainFrame())
+  // Or for sub frames when explicitly enabled
+  if (!render_frame->IsMainFrame() &&
+      !base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kNodeIntegrationInSubFrames))
     return;
 
   auto* isolate = context->GetIsolate();

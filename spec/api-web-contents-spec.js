@@ -264,7 +264,9 @@ describe('webContents module', () => {
 
   describe('openDevTools() API', () => {
     it('can show window with activation', async () => {
+      const focused = emittedOnce(w, 'focus')
       w.show()
+      await focused
       assert.strictEqual(w.isFocused(), true)
       const devtoolsOpened = emittedOnce(w.webContents, 'devtools-opened')
       w.webContents.openDevTools({ mode: 'detach', activate: true })
@@ -992,6 +994,34 @@ describe('webContents module', () => {
         }
       })
       w.loadFile(path.join(fixtures, 'pages', 'a.html'))
+    })
+  })
+
+  describe('ipc-message event', () => {
+    it('emits when the renderer process sends an asynchronous message', async () => {
+      const webContents = remote.getCurrentWebContents()
+      const promise = emittedOnce(webContents, 'ipc-message')
+
+      ipcRenderer.send('message', 'Hello World!')
+
+      const [, channel, message] = await promise
+      expect(channel).to.equal('message')
+      expect(message).to.equal('Hello World!')
+    })
+  })
+
+  describe('ipc-message-sync event', () => {
+    it('emits when the renderer process sends a synchronous message', async () => {
+      const webContents = remote.getCurrentWebContents()
+      const promise = emittedOnce(webContents, 'ipc-message-sync')
+
+      ipcRenderer.send('handle-next-ipc-message-sync', 'foobar')
+      const result = ipcRenderer.sendSync('message', 'Hello World!')
+
+      const [, channel, message] = await promise
+      expect(channel).to.equal('message')
+      expect(message).to.equal('Hello World!')
+      expect(result).to.equal('foobar')
     })
   })
 

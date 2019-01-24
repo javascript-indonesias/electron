@@ -75,6 +75,7 @@ extern const char kSandbox[];
 extern const char kWebSecurity[];
 extern const char kAllowRunningInsecureContent[];
 extern const char kOffscreen[];
+extern const char kNodeIntegrationInSubFrames[];
 
 }  // namespace options
 
@@ -83,7 +84,6 @@ extern const char kOffscreen[];
 namespace switches {
 
 extern const char kEnableSandbox[];
-extern const char kEnableMixedSandbox[];
 extern const char kEnablePlugins[];
 extern const char kPpapiFlashPath[];
 extern const char kPpapiFlashVersion[];
@@ -107,6 +107,7 @@ extern const char kHiddenPage[];
 extern const char kNativeWindowOpen[];
 extern const char kNodeIntegrationInWorker[];
 extern const char kWebviewTag[];
+extern const char kNodeIntegrationInSubFrames[];
 
 extern const char kWidevineCdmPath[];
 extern const char kWidevineCdmVersion[];

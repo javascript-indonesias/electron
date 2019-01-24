@@ -154,15 +154,14 @@ const char kAllowRunningInsecureContent[] = "allowRunningInsecureContent";
 
 const char kOffscreen[] = "offscreen";
 
+const char kNodeIntegrationInSubFrames[] = "nodeIntegrationInSubFrames";
+
 }  // namespace options
 
 namespace switches {
 
 // Enable chromium sandbox.
 const char kEnableSandbox[] = "enable-sandbox";
-
-// Enable sandbox in only remote content windows.
-const char kEnableMixedSandbox[] = "enable-mixed-sandbox";
 
 // Enable plugins.
 const char kEnablePlugins[] = "enable-plugins";
@@ -207,6 +206,10 @@ const char kWebviewTag[] = "webview-tag";
 
 // Command switch passed to renderer process to control nodeIntegration.
 const char kNodeIntegrationInWorker[] = "node-integration-in-worker";
+
+// Command switch passed to renderer process to control whether node
+// environments will be created in sub-frames.
+const char kNodeIntegrationInSubFrames[] = "node-integration-in-subframes";
 
 // Widevine options
 // Path to Widevine CDM binaries.

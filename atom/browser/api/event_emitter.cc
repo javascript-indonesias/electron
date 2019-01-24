@@ -35,7 +35,8 @@ v8::Local<v8::Object> CreateEventObject(v8::Isolate* isolate) {
   }
 
   return v8::Local<v8::ObjectTemplate>::New(isolate, event_template)
-      ->NewInstance();
+      ->NewInstance(isolate->GetCurrentContext())
+      .ToLocalChecked();
 }
 
 }  // namespace
@@ -56,9 +57,10 @@ v8::Local<v8::Object> CreateJSEvent(v8::Isolate* isolate,
   } else {
     event = CreateEventObject(isolate);
   }
-  mate::Dictionary(isolate, event).Set("sender", object);
+  mate::Dictionary dict(isolate, event);
+  dict.Set("sender", object);
   if (sender)
-    mate::Dictionary(isolate, event).Set("frameId", sender->GetRoutingID());
+    dict.Set("frameId", sender->GetRoutingID());
   return event;
 }
 
