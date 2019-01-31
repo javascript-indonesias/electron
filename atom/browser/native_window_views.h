@@ -158,10 +158,8 @@ class NativeWindowViews : public NativeWindow,
   void OnWidgetActivationChanged(views::Widget* widget, bool active) override;
   void OnWidgetBoundsChanged(views::Widget* widget,
                              const gfx::Rect& bounds) override;
-  void AutoresizeBrowserView(int width_delta,
-                             int height_delta,
-                             NativeBrowserView* browser_view);
   void OnWidgetDestroying(views::Widget* widget) override;
+
   // views::WidgetDelegate:
   void DeleteDelegate() override;
   views::View* GetInitiallyFocusedView() override;
@@ -243,6 +241,8 @@ class NativeWindowViews : public NativeWindow,
   AtomDesktopWindowTreeHostWin* atom_desktop_window_tree_host_win_;
 
   ui::WindowShowState last_window_state_;
+
+  gfx::Rect last_normal_placement_bounds_;
 
   // There's an issue with restore on Windows, that sometimes causes the Window
   // to receive the wrong size (#2498). To circumvent that, we keep tabs on the

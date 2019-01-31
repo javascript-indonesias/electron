@@ -32,6 +32,7 @@
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/hit_test.h"
 #include "ui/gfx/image/image.h"
+#include "ui/gfx/native_widget_types.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/webview/unhandled_keyboard_event_handler.h"
 #include "ui/views/controls/webview/webview.h"
@@ -80,6 +81,27 @@ void FlipWindowStyle(HWND handle, bool on, DWORD flag) {
     style &= ~flag;
   ::SetWindowLong(handle, GWL_STYLE, style);
 }
+
+// Similar to the ones in display::win::ScreenWin, but with rounded values
+// These help to avoid problems that arise from unresizable windows where the
+// original ceil()-ed values can cause calculation errors, since converting
+// both ways goes through a ceil() call. Related issue: #15816
+gfx::Rect ScreenToDIPRect(HWND hwnd, const gfx::Rect& pixel_bounds) {
+  float scale_factor = display::win::ScreenWin::GetScaleFactorForHWND(hwnd);
+  gfx::Rect dip_rect = ScaleToRoundedRect(pixel_bounds, 1.0f / scale_factor);
+  dip_rect.set_origin(
+      display::win::ScreenWin::ScreenToDIPRect(hwnd, pixel_bounds).origin());
+  return dip_rect;
+}
+
+gfx::Rect DIPToScreenRect(HWND hwnd, const gfx::Rect& pixel_bounds) {
+  float scale_factor = display::win::ScreenWin::GetScaleFactorForHWND(hwnd);
+  gfx::Rect screen_rect = ScaleToRoundedRect(pixel_bounds, scale_factor);
+  screen_rect.set_origin(
+      display::win::ScreenWin::DIPToScreenRect(hwnd, pixel_bounds).origin());
+  return screen_rect;
+}
+
 #endif
 
 class NativeWindowClientView : public views::ClientView {
@@ -238,7 +260,7 @@ NativeWindowViews::NativeWindowViews(const mate::Dictionary& options,
   if (!has_frame()) {
     // Set Window style so that we get a minimize and maximize animation when
     // frameless.
-    DWORD frame_style = WS_CAPTION;
+    DWORD frame_style = WS_CAPTION | WS_OVERLAPPED;
     if (resizable_)
       frame_style |= WS_THICKFRAME;
     if (minimizable_)
@@ -1076,7 +1098,10 @@ bool NativeWindowViews::IsVisibleOnAllWorkspaces() {
 }
 
 gfx::AcceleratedWidget NativeWindowViews::GetAcceleratedWidget() const {
-  return GetNativeWindow()->GetHost()->GetAcceleratedWidget();
+  if (GetNativeWindow() && GetNativeWindow()->GetHost())
+    return GetNativeWindow()->GetHost()->GetAcceleratedWidget();
+  else
+    return gfx::kNullAcceleratedWidget;
 }
 
 NativeWindowHandle NativeWindowViews::GetNativeWindowHandle() const {
@@ -1091,8 +1116,8 @@ gfx::Rect NativeWindowViews::ContentBoundsToWindowBounds(
   gfx::Rect window_bounds(bounds);
 #if defined(OS_WIN)
   HWND hwnd = GetAcceleratedWidget();
-  gfx::Rect dpi_bounds = display::win::ScreenWin::DIPToScreenRect(hwnd, bounds);
-  window_bounds = display::win::ScreenWin::ScreenToDIPRect(
+  gfx::Rect dpi_bounds = DIPToScreenRect(hwnd, bounds);
+  window_bounds = ScreenToDIPRect(
       hwnd,
       widget()->non_client_view()->GetWindowBoundsForClientBounds(dpi_bounds));
 #endif
@@ -1113,8 +1138,7 @@ gfx::Rect NativeWindowViews::WindowBoundsToContentBounds(
   gfx::Rect content_bounds(bounds);
 #if defined(OS_WIN)
   HWND hwnd = GetAcceleratedWidget();
-  content_bounds.set_size(
-      display::win::ScreenWin::DIPToScreenSize(hwnd, content_bounds.size()));
+  content_bounds.set_size(DIPToScreenRect(hwnd, content_bounds).size());
   RECT rect;
   SetRectEmpty(&rect);
   DWORD style = ::GetWindowLong(hwnd, GWL_STYLE);
@@ -1122,8 +1146,7 @@ gfx::Rect NativeWindowViews::WindowBoundsToContentBounds(
   AdjustWindowRectEx(&rect, style, FALSE, ex_style);
   content_bounds.set_width(content_bounds.width() - (rect.right - rect.left));
   content_bounds.set_height(content_bounds.height() - (rect.bottom - rect.top));
-  content_bounds.set_size(
-      display::win::ScreenWin::ScreenToDIPSize(hwnd, content_bounds.size()));
+  content_bounds.set_size(ScreenToDIPRect(hwnd, content_bounds).size());
 #endif
 
   if (root_view_->HasMenu() && root_view_->IsMenuBarVisible()) {
@@ -1176,26 +1199,6 @@ void NativeWindowViews::OnWidgetActivationChanged(views::Widget* changed_widget,
   root_view_->ResetAltState();
 }
 
-void NativeWindowViews::AutoresizeBrowserView(int width_delta,
-                                              int height_delta,
-                                              NativeBrowserView* browser_view) {
-  const auto flags =
-      static_cast<NativeBrowserViewViews*>(browser_view)->GetAutoResizeFlags();
-  if (!(flags & kAutoResizeWidth)) {
-    width_delta = 0;
-  }
-  if (!(flags & kAutoResizeHeight)) {
-    height_delta = 0;
-  }
-  if (height_delta || width_delta) {
-    auto* view = browser_view->GetInspectableWebContentsView()->GetView();
-    auto new_view_size = view->size();
-    new_view_size.set_width(new_view_size.width() + width_delta);
-    new_view_size.set_height(new_view_size.height() + height_delta);
-    view->SetSize(new_view_size);
-  }
-}
-
 void NativeWindowViews::OnWidgetBoundsChanged(views::Widget* changed_widget,
                                               const gfx::Rect& bounds) {
   if (changed_widget != widget())
@@ -1208,7 +1211,10 @@ void NativeWindowViews::OnWidgetBoundsChanged(views::Widget* changed_widget,
     int width_delta = new_bounds.width() - widget_size_.width();
     int height_delta = new_bounds.height() - widget_size_.height();
     for (NativeBrowserView* item : browser_views()) {
-      AutoresizeBrowserView(width_delta, height_delta, item);
+      NativeBrowserViewViews* native_view =
+          static_cast<NativeBrowserViewViews*>(item);
+      native_view->SetAutoResizeProportions(widget_size_);
+      native_view->AutoResize(new_bounds, width_delta, height_delta);
     }
 
     NotifyWindowResize();
