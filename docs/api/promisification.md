@@ -9,8 +9,6 @@ When a majority of affected functions are migrated, this flag will be enabled by
 ### Candidate Functions
 
 - [app.importCertificate(options, callback)](https://github.com/electron/electron/blob/master/docs/api/app.md#importCertificate)
-- [request.write(chunk[, encoding][, callback])](https://github.com/electron/electron/blob/master/docs/api/client-request.md#write)
-- [request.end([chunk][, encoding][, callback])](https://github.com/electron/electron/blob/master/docs/api/client-request.md#end)
 - [contentTracing.getTraceBufferUsage(callback)](https://github.com/electron/electron/blob/master/docs/api/content-tracing.md#getTraceBufferUsage)
 - [debugger.sendCommand(method[, commandParams, callback])](https://github.com/electron/electron/blob/master/docs/api/debugger.md#sendCommand)
 - [dialog.showOpenDialog([browserWindow, ]options[, callback])](https://github.com/electron/electron/blob/master/docs/api/dialog.md#showOpenDialog)
@@ -29,7 +27,6 @@ When a majority of affected functions are migrated, this flag will be enabled by
 - [ses.getBlobData(identifier, callback)](https://github.com/electron/electron/blob/master/docs/api/session.md#getBlobData)
 - [ses.clearAuthCache(options[, callback])](https://github.com/electron/electron/blob/master/docs/api/session.md#clearAuthCache)
 - [contents.executeJavaScript(code[, userGesture, callback])](https://github.com/electron/electron/blob/master/docs/api/web-contents.md#executeJavaScript)
-- [contents.unregisterServiceWorker(callback)](https://github.com/electron/electron/blob/master/docs/api/web-contents.md#unregisterServiceWorker)
 - [contents.print([options], [callback])](https://github.com/electron/electron/blob/master/docs/api/web-contents.md#print)
 - [contents.printToPDF(options, callback)](https://github.com/electron/electron/blob/master/docs/api/web-contents.md#printToPDF)
 - [contents.savePage(fullPath, saveType, callback)](https://github.com/electron/electron/blob/master/docs/api/web-contents.md#savePage)
@@ -55,4 +52,3 @@ When a majority of affected functions are migrated, this flag will be enabled by
 - [webviewTag.capturePage([rect, ]callback)](https://github.com/electron/electron/blob/master/docs/api/webview-tag.md#capturePage)
 - [win.capturePage([rect, ]callback)](https://github.com/electron/electron/blob/master/docs/api/browser-window.md#capturePage)
 - [desktopCapturer.getSources(options, callback)](https://github.com/electron/electron/blob/master/docs/api/desktop-capturer.md#getSources)
-- [contents.hasServiceWorker(callback)](https://github.com/electron/electron/blob/master/docs/api/web-contents.md#hasServiceWorker)

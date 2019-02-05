@@ -36,6 +36,7 @@ filenames = {
     "lib/browser/api/web-contents-view.js",
     "lib/browser/chrome-devtools.js",
     "lib/browser/chrome-extension.js",
+    "lib/browser/crash-reporter-init.js",
     "lib/browser/default-menu.js",
     "lib/browser/guest-view-manager.js",
     "lib/browser/guest-window-manager.js",
@@ -99,6 +100,9 @@ filenames = {
     "default_app/package.json",
     "default_app/renderer.js",
     "default_app/styles.css",
+  ]
+
+  default_app_octicon_sources = [
     "node_modules/octicons/build/build.css",
     "node_modules/octicons/build/svg/gist.svg",
     "node_modules/octicons/build/svg/mark-github.svg",

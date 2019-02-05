@@ -23,18 +23,6 @@ const fixTypes = new Set(['fix'])
 const otherTypes = new Set(['spec', 'build', 'test', 'chore', 'deps', 'refactor', 'tools', 'vendor', 'perf', 'style', 'ci'])
 const knownTypes = new Set([...breakTypes.keys(), ...docTypes.keys(), ...featTypes.keys(), ...fixTypes.keys(), ...otherTypes.keys()])
 
-const semanticMap = new Map()
-for (const line of fs.readFileSync(path.resolve(__dirname, 'legacy-pr-semantic-map.csv'), 'utf8').split('\n')) {
-  if (!line) {
-    continue
-  }
-  const bits = line.split(',')
-  if (bits.length !== 2) {
-    continue
-  }
-  semanticMap.set(bits[0], bits[1])
-}
-
 const runGit = async (dir, args) => {
   const response = await GitProcess.exec(args, dir)
   if (response.exitCode !== 0) {
@@ -65,9 +53,7 @@ const setPullRequest = (commit, owner, repo, number) => {
 
 const getNoteFromClerk = async (number, owner, repo) => {
   const comments = await getComments(number, owner, repo)
-  if (!comments && !comments.data) {
-    return
-  }
+  if (!comments || !comments.data) return
 
   const CLERK_LOGIN = 'release-clerk[bot]'
   const PERSIST_LEAD = '**Release Notes Persisted**\n\n'
