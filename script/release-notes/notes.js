@@ -56,6 +56,7 @@ const getNoteFromClerk = async (number, owner, repo) => {
   if (!comments || !comments.data) return
 
   const CLERK_LOGIN = 'release-clerk[bot]'
+  const CLERK_NO_NOTES = '**No Release Notes**'
   const PERSIST_LEAD = '**Release Notes Persisted**\n\n'
   const QUOTE_LEAD = '> '
 
@@ -63,18 +64,19 @@ const getNoteFromClerk = async (number, owner, repo) => {
     if (comment.user.login !== CLERK_LOGIN) {
       continue
     }
-    if (!comment.body.startsWith(PERSIST_LEAD)) {
-      continue
+    if (comment.body === CLERK_NO_NOTES) {
+      return NO_NOTES
     }
-    const note = comment.body
-      .slice(PERSIST_LEAD.length).trim() // remove PERSIST_LEAD
-      .split('\r?\n') // break into lines
-      .map(line => line.trim())
-      .filter(line => line.startsWith(QUOTE_LEAD)) // notes are quoted
-      .map(line => line.slice(QUOTE_LEAD.length)) // unquote the lines
-      .join(' ') // join the note lines
-      .trim()
-    return note
+    if (comment.body.startsWith(PERSIST_LEAD)) {
+      return comment.body
+        .slice(PERSIST_LEAD.length).trim() // remove PERSIST_LEAD
+        .split('\r?\n') // break into lines
+        .map(line => line.trim())
+        .filter(line => line.startsWith(QUOTE_LEAD)) // notes are quoted
+        .map(line => line.slice(QUOTE_LEAD.length)) // unquote the lines
+        .join(' ') // join the note lines
+        .trim()
+    }
   }
 }
 
@@ -519,10 +521,13 @@ const getNotes = async (fromRef, toRef, newVersion) => {
       }
 
       // try to pull a release note from the pull comment
-      const prParsed = {}
-      parseCommitMessage(`${prData.data.title}\n\n${prData.data.body}`, pr.owner, pr.repo, prParsed)
-      commit.note = commit.note || prParsed.note
-      commit.type = commit.type || prParsed.type
+      const prParsed = parseCommitMessage(`${prData.data.title}\n\n${prData.data.body}`, pr.owner, pr.repo)
+      if (!commit.note) {
+        commit.note = prParsed.note
+      }
+      if (!commit.type || prParsed.type === 'breaking-change') {
+        commit.type = prParsed.type
+      }
       prSubject = prSubject || prParsed.subject
 
       pr = prParsed.pr && (prParsed.pr.number !== pr.number) ? prParsed.pr : null

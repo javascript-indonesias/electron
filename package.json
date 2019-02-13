@@ -1,6 +1,6 @@
 {
   "name": "electron",
-  "version": "6.0.0-nightly.20190123",
+  "version": "6.0.0-nightly.20190212",
   "repository": "https://github.com/electron/electron",
   "description": "Build cross platform desktop apps with JavaScript, HTML, and CSS",
   "devDependencies": {
@@ -36,6 +36,7 @@
     "standard-markdown": "^5.0.0",
     "sumchecker": "^2.0.2",
     "temp": "^0.8.3",
+    "tsify": "^4.0.1",
     "typescript": "~3.1.1",
     "typescript-eslint-parser": "^21.0.0"
   },
