@@ -68,4 +68,45 @@ declare namespace ElectronInternal {
     promisify<T extends (...args: any[]) => any>(fn: T): T;
     promisifyMultiArg<T extends (...args: any[]) => any>(fn: T): T;
   }
+
+  // Internal IPC has _replyInternal and NO reply method
+  interface IpcMainInternalEvent extends Omit<Electron.IpcMainEvent, 'reply'> {
+    _replyInternal(...args: any[]): void;
+  }
+
+  interface IpcMainInternal extends Electron.EventEmitter {
+    on(channel: string, listener: (event: IpcMainInternalEvent, ...args: any[]) => void): this;
+    once(channel: string, listener: (event: IpcMainInternalEvent, ...args: any[]) => void): this;
+  }
+}
+
+declare namespace Chrome {
+  namespace Tabs {
+    // https://developer.chrome.com/extensions/tabs#method-executeScript
+    interface ExecuteScriptDetails {
+      code?: string;
+      file?: string;
+      allFrames?: boolean;
+      frameId?: number;
+      matchAboutBlank?: boolean;
+      runAt?: 'document-start' | 'document-end' | 'document_idle';
+      cssOrigin: 'author' | 'user';
+    }
+
+    type ExecuteScriptCallback = (result: Array<any>) => void;
+
+    // https://developer.chrome.com/extensions/tabs#method-sendMessage
+    interface SendMessageDetails {
+      frameId?: number;
+    }
+
+    type SendMessageCallback = (result: any) => void;
+  }
+}
+
+interface Global extends NodeJS.Global {
+  require: NodeRequire;
+  module: NodeModule;
+  __filename: string;
+  __dirname: string;
 }
