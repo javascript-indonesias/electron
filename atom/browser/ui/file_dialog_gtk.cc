@@ -126,13 +126,13 @@ class FileChooserDialog {
     gtk_window_present_with_time(GTK_WINDOW(dialog_), time);
   }
 
-  void RunSaveAsynchronous(const SaveDialogCallback& callback) {
-    save_callback_ = callback;
+  void RunSaveAsynchronous(atom::util::Promise promise) {
+    save_promise_.reset(new atom::util::Promise(std::move(promise)));
     RunAsynchronous();
   }
 
-  void RunOpenAsynchronous(const OpenDialogCallback& callback) {
-    open_callback_ = callback;
+  void RunOpenAsynchronous(atom::util::Promise promise) {
+    open_promise_.reset(new atom::util::Promise(std::move(promise)));
     RunAsynchronous();
   }
 
@@ -173,8 +173,8 @@ class FileChooserDialog {
   GtkWidget* preview_;
 
   Filters filters_;
-  SaveDialogCallback save_callback_;
-  OpenDialogCallback open_callback_;
+  std::unique_ptr<atom::util::Promise> save_promise_;
+  std::unique_ptr<atom::util::Promise> open_promise_;
 
   // Callback for when we update the preview for the selection.
   CHROMEG_CALLBACK_0(FileChooserDialog, void, OnUpdatePreview, GtkWidget*);
@@ -184,17 +184,28 @@ class FileChooserDialog {
 
 void FileChooserDialog::OnFileDialogResponse(GtkWidget* widget, int response) {
   gtk_widget_hide(dialog_);
-
-  if (!save_callback_.is_null()) {
-    if (response == GTK_RESPONSE_ACCEPT)
-      save_callback_.Run(true, GetFileName());
-    else
-      save_callback_.Run(false, base::FilePath());
-  } else if (!open_callback_.is_null()) {
-    if (response == GTK_RESPONSE_ACCEPT)
-      open_callback_.Run(true, GetFileNames());
-    else
-      open_callback_.Run(false, std::vector<base::FilePath>());
+  if (save_promise_) {
+    mate::Dictionary dict =
+        mate::Dictionary::CreateEmpty(save_promise_->isolate());
+    if (response == GTK_RESPONSE_ACCEPT) {
+      dict.Set("canceled", false);
+      dict.Set("filePath", GetFileName());
+    } else {
+      dict.Set("canceled", true);
+      dict.Set("filePath", base::FilePath());
+    }
+    save_promise_->Resolve(dict.GetHandle());
+  } else if (open_promise_) {
+    mate::Dictionary dict =
+        mate::Dictionary::CreateEmpty(open_promise_->isolate());
+    if (response == GTK_RESPONSE_ACCEPT) {
+      dict.Set("canceled", false);
+      dict.Set("filePaths", GetFileNames());
+    } else {
+      dict.Set("canceled", true);
+      dict.Set("filePaths", std::vector<base::FilePath>());
+    }
+    open_promise_->Resolve(dict.GetHandle());
   }
   delete this;
 }
@@ -252,8 +263,8 @@ void FileChooserDialog::OnUpdatePreview(GtkWidget* chooser) {
 
 }  // namespace
 
-bool ShowOpenDialog(const DialogSettings& settings,
-                    std::vector<base::FilePath>* paths) {
+bool ShowOpenDialogSync(const DialogSettings& settings,
+                        std::vector<base::FilePath>* paths) {
   GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
   if (settings.properties & FILE_DIALOG_OPEN_DIRECTORY)
     action = GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER;
@@ -265,38 +276,36 @@ bool ShowOpenDialog(const DialogSettings& settings,
   if (response == GTK_RESPONSE_ACCEPT) {
     *paths = open_dialog.GetFileNames();
     return true;
-  } else {
-    return false;
   }
+  return false;
 }
 
 void ShowOpenDialog(const DialogSettings& settings,
-                    const OpenDialogCallback& callback) {
+                    atom::util::Promise promise) {
   GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
   if (settings.properties & FILE_DIALOG_OPEN_DIRECTORY)
     action = GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER;
   FileChooserDialog* open_dialog = new FileChooserDialog(action, settings);
   open_dialog->SetupProperties(settings.properties);
-  open_dialog->RunOpenAsynchronous(callback);
+  open_dialog->RunOpenAsynchronous(std::move(promise));
 }
 
-bool ShowSaveDialog(const DialogSettings& settings, base::FilePath* path) {
+bool ShowSaveDialogSync(const DialogSettings& settings, base::FilePath* path) {
   FileChooserDialog save_dialog(GTK_FILE_CHOOSER_ACTION_SAVE, settings);
   gtk_widget_show_all(save_dialog.dialog());
   int response = gtk_dialog_run(GTK_DIALOG(save_dialog.dialog()));
   if (response == GTK_RESPONSE_ACCEPT) {
     *path = save_dialog.GetFileName();
     return true;
-  } else {
-    return false;
   }
+  return false;
 }
 
 void ShowSaveDialog(const DialogSettings& settings,
-                    const SaveDialogCallback& callback) {
+                    atom::util::Promise promise) {
   FileChooserDialog* save_dialog =
       new FileChooserDialog(GTK_FILE_CHOOSER_ACTION_SAVE, settings);
-  save_dialog->RunSaveAsynchronous(callback);
+  save_dialog->RunSaveAsynchronous(std::move(promise));
 }
 
 }  // namespace file_dialog
