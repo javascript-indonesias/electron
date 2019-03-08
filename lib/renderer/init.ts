@@ -86,14 +86,15 @@ switch (window.location.protocol) {
 
     // Inject content scripts.
     if (process.isMainFrame) {
-      require('@electron/internal/renderer/content-scripts-injector')
+      require('@electron/internal/renderer/content-scripts-injector')(process.getRenderProcessPreferences)
     }
   }
 }
 
 // Load webview tag implementation.
 if (process.isMainFrame) {
-  require('@electron/internal/renderer/web-view/web-view-init')(contextIsolation, webviewTag, guestInstanceId)
+  const { webViewInit } = require('@electron/internal/renderer/web-view/web-view-init')
+  webViewInit(contextIsolation, webviewTag, guestInstanceId)
 }
 
 // Pass the arguments to isolatedWorld.

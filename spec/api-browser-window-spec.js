@@ -2097,6 +2097,28 @@ describe('BrowserWindow module', () => {
         expect(typeofProcess).to.eql('undefined')
       })
     })
+
+    describe('"disableHtmlFullscreenWindowResize" option', () => {
+      it('prevents window from resizing when set', (done) => {
+        w.destroy()
+        w = new BrowserWindow({
+          show: false,
+          webPreferences: {
+            disableHtmlFullscreenWindowResize: true
+          }
+        })
+        w.webContents.once('did-finish-load', () => {
+          const size = w.getSize()
+          w.webContents.once('enter-html-full-screen', () => {
+            const newSize = w.getSize()
+            expect(newSize).to.deep.equal(size)
+            done()
+          })
+          w.webContents.executeJavaScript('document.body.webkitRequestFullscreen()', true)
+        })
+        w.loadURL('about:blank')
+      })
+    })
   })
 
   describe('nativeWindowOpen + contextIsolation options', () => {
@@ -3181,9 +3203,11 @@ describe('BrowserWindow module', () => {
   })
 
   describe('window.getNativeWindowHandle()', () => {
-    if (!nativeModulesEnabled) {
-      this.skip()
-    }
+    before(function () {
+      if (!nativeModulesEnabled) {
+        this.skip()
+      }
+    })
 
     it('returns valid handle', () => {
       // The module's source code is hosted at

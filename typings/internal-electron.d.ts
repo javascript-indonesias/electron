@@ -66,7 +66,9 @@ declare namespace ElectronInternal {
     renameProperty<T, K extends (keyof T & string)>(object: T, oldName: string, newName: K): T;
 
     promisify<T extends (...args: any[]) => any>(fn: T): T;
-    promisifyMultiArg<T extends (...args: any[]) => any>(fn: T, convertPromiseValue: (v: any) => any): T;
+
+    // convertPromiseValue: Temporarily disabled until it's used
+    promisifyMultiArg<T extends (...args: any[]) => any>(fn: T, /*convertPromiseValue: (v: any) => any*/): T;
   }
 
   // Internal IPC has _replyInternal and NO reply method
@@ -77,6 +79,34 @@ declare namespace ElectronInternal {
   interface IpcMainInternal extends Electron.EventEmitter {
     on(channel: string, listener: (event: IpcMainInternalEvent, ...args: any[]) => void): this;
     once(channel: string, listener: (event: IpcMainInternalEvent, ...args: any[]) => void): this;
+  }
+
+  interface WebFrameInternal extends Electron.WebFrame {
+    getWebFrameId(window: Window): number;
+    allowGuestViewElementDefinition(window: Window, context: any): void;
+  }
+
+  interface WebFrameResizeEvent extends Electron.Event {
+    newWidth: number;
+    newHeight: number;
+  }
+
+  interface WebViewEvent extends Event {
+    url: string;
+    isMainFrame: boolean;
+  }
+
+  abstract class WebViewElement extends HTMLElement {
+    static observedAttributes: Array<string>;
+
+    public contentWindow: Window;
+
+    public connectedCallback(): void;
+    public attributeChangedCallback(): void;
+    public disconnectedCallback(): void;
+
+    // Created in web-view-impl
+    public getWebContents(): Electron.WebContents;
   }
 }
 
