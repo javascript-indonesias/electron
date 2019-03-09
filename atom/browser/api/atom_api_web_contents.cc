@@ -97,7 +97,7 @@
 #endif
 
 #if defined(OS_LINUX) || defined(OS_WIN)
-#include "content/public/common/renderer_preferences.h"
+#include "third_party/blink/public/mojom/renderer_preferences.mojom.h"
 #include "ui/gfx/font_render_params.h"
 #endif
 
@@ -669,7 +669,8 @@ void WebContents::RendererResponsive(
     observer.OnRendererResponsive();
 }
 
-bool WebContents::HandleContextMenu(const content::ContextMenuParams& params) {
+bool WebContents::HandleContextMenu(content::RenderFrameHost* render_frame_host,
+                                    const content::ContextMenuParams& params) {
   if (params.custom_context.is_pepper_menu) {
     Emit("pepper-context-menu", std::make_pair(params, web_contents()),
          base::Bind(&content::WebContents::NotifyContextMenuClosed,
@@ -2283,4 +2284,4 @@ void Initialize(v8::Local<v8::Object> exports,
 
 }  // namespace
 
-NODE_BUILTIN_MODULE_CONTEXT_AWARE(atom_browser_web_contents, Initialize)
+NODE_LINKED_MODULE_CONTEXT_AWARE(atom_browser_web_contents, Initialize)

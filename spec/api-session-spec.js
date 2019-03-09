@@ -142,7 +142,7 @@ describe('session module', () => {
         error = e
       }
       expect(error).is.an('Error')
-      expect(error).to.have.property('message').which.equals('Setting cookie failed')
+      expect(error).to.have.property('message').which.equals('Failed to get cookie domain')
     })
 
     it('should overwrite previous cookies', async () => {
@@ -324,6 +324,26 @@ describe('session module', () => {
   describe('ses.clearStorageData(options)', () => {
     fixtures = path.resolve(__dirname, 'fixtures')
     it('clears localstorage data', (done) => {
+      ipcMain.on('count', (event, count) => {
+        ipcMain.removeAllListeners('count')
+        assert.strictEqual(count, 0)
+        done()
+      })
+      w.webContents.on('did-finish-load', () => {
+        const options = {
+          origin: 'file://',
+          storages: ['localstorage'],
+          quotas: ['persistent']
+        }
+        w.webContents.session.clearStorageData(options).then(() => {
+          w.webContents.send('getcount')
+        })
+      })
+      w.loadFile(path.join(fixtures, 'api', 'localstorage.html'))
+    })
+
+    // TODO(codebytere): remove when promisification is complete
+    it('clears localstorage data (callback)', (done) => {
       ipcMain.on('count', (event, count) => {
         ipcMain.removeAllListeners('count')
         assert.strictEqual(count, 0)
@@ -613,7 +633,7 @@ describe('session module', () => {
     })
   })
 
-  describe('ses.setProxy(options, callback)', () => {
+  describe('ses.setProxy(options)', () => {
     let server = null
     let customSession = null
 
@@ -623,7 +643,7 @@ describe('session module', () => {
       // creation of request context which in turn initializes
       // the network context, can be removed with network
       // service enabled.
-      customSession.clearHostResolverCache(() => done())
+      customSession.clearHostResolverCache().then(() => done())
     })
 
     afterEach(() => {
@@ -635,30 +655,78 @@ describe('session module', () => {
       }
     })
 
-    it('allows configuring proxy settings', (done) => {
+    it('allows configuring proxy settings', async () => {
+      const config = { proxyRules: 'http=myproxy:80' }
+      await customSession.setProxy(config)
+      const proxy = await customSession.resolveProxy('http://example.com/')
+      assert.strictEqual(proxy, 'PROXY myproxy:80')
+    })
+
+    // TODO(codebytere): remove when Promisification is complete
+    it('allows configuring proxy settings (callback)', (done) => {
       const config = { proxyRules: 'http=myproxy:80' }
       customSession.setProxy(config, () => {
-        customSession.resolveProxy('http://example.com/', (proxy) => {
+        customSession.resolveProxy('http://example.com/', proxy => {
           assert.strictEqual(proxy, 'PROXY myproxy:80')
           done()
         })
       })
     })
 
-    it('allows removing the implicit bypass rules for localhost', (done) => {
+    it('allows removing the implicit bypass rules for localhost', async () => {
       const config = {
         proxyRules: 'http=myproxy:80',
         proxyBypassRules: '<-loopback>'
       }
-      customSession.setProxy(config, () => {
-        customSession.resolveProxy('http://localhost', (proxy) => {
+
+      await customSession.setProxy(config)
+      const proxy = await customSession.resolveProxy('http://localhost')
+      assert.strictEqual(proxy, 'PROXY myproxy:80')
+    })
+
+    // TODO(codebytere): remove when Promisification is complete
+    it('allows removing the implicit bypass rules for localhost (callback)', (done) => {
+      const config = {
+        proxyRules: 'http=myproxy:80',
+        proxyBypassRules: '<-loopback>'
+      }
+      customSession.setProxy(config).then(() => {
+        customSession.resolveProxy('http://localhost').then(proxy => {
           assert.strictEqual(proxy, 'PROXY myproxy:80')
           done()
         })
       })
     })
 
-    it('allows configuring proxy settings with pacScript', (done) => {
+    it('allows configuring proxy settings with pacScript', async () => {
+      server = http.createServer((req, res) => {
+        const pac = `
+          function FindProxyForURL(url, host) {
+            return "PROXY myproxy:8132";
+          }
+        `
+        res.writeHead(200, {
+          'Content-Type': 'application/x-ns-proxy-autoconfig'
+        })
+        res.end(pac)
+      })
+      return new Promise((resolve, reject) => {
+        server.listen(0, '127.0.0.1', async () => {
+          try {
+            const config = { pacScript: `http://127.0.0.1:${server.address().port}` }
+            await customSession.setProxy(config)
+            const proxy = await customSession.resolveProxy('https://google.com')
+            assert.strictEqual(proxy, 'PROXY myproxy:8132')
+            resolve()
+          } catch (error) {
+            reject(error)
+          }
+        })
+      })
+    })
+
+    // TODO(codebytere): reconfigure when Promisification is complete
+    it('allows configuring proxy settings with pacScript (callback)', (done) => {
       server = http.createServer((req, res) => {
         const pac = `
           function FindProxyForURL(url, host) {
@@ -673,7 +741,7 @@ describe('session module', () => {
       server.listen(0, '127.0.0.1', () => {
         const config = { pacScript: `http://127.0.0.1:${server.address().port}` }
         customSession.setProxy(config, () => {
-          customSession.resolveProxy('https://google.com', (proxy) => {
+          customSession.resolveProxy('https://google.com', proxy => {
             assert.strictEqual(proxy, 'PROXY myproxy:8132')
             done()
           })
@@ -681,13 +749,24 @@ describe('session module', () => {
       })
     })
 
-    it('allows bypassing proxy settings', (done) => {
+    it('allows bypassing proxy settings', async () => {
+      const config = {
+        proxyRules: 'http=myproxy:80',
+        proxyBypassRules: '<local>'
+      }
+      await customSession.setProxy(config)
+      const proxy = await customSession.resolveProxy('http://example/')
+      assert.strictEqual(proxy, 'DIRECT')
+    })
+
+    // TODO(codebytere): remove when Promisification is complete
+    it('allows bypassing proxy settings (callback)', (done) => {
       const config = {
         proxyRules: 'http=myproxy:80',
         proxyBypassRules: '<local>'
       }
       customSession.setProxy(config, () => {
-        customSession.resolveProxy('http://example/', (proxy) => {
+        customSession.resolveProxy('http://example/', proxy => {
           assert.strictEqual(proxy, 'DIRECT')
           done()
         })
@@ -886,8 +965,61 @@ describe('session module', () => {
     })
   })
 
-  describe('ses.clearAuthCache(options[, callback])', () => {
+  describe('ses.clearAuthCache(options)', () => {
     it('can clear http auth info from cache', (done) => {
+      const ses = session.fromPartition('auth-cache')
+      const server = http.createServer((req, res) => {
+        const credentials = auth(req)
+        if (!credentials || credentials.name !== 'test' || credentials.pass !== 'test') {
+          res.statusCode = 401
+          res.setHeader('WWW-Authenticate', 'Basic realm="Restricted"')
+          res.end()
+        } else {
+          res.end('authenticated')
+        }
+      })
+      server.listen(0, '127.0.0.1', () => {
+        const port = server.address().port
+        function issueLoginRequest (attempt = 1) {
+          if (attempt > 2) {
+            server.close()
+            return done()
+          }
+          const request = net.request({
+            url: `http://127.0.0.1:${port}`,
+            session: ses
+          })
+          request.on('login', (info, callback) => {
+            attempt += 1
+            assert.strictEqual(info.scheme, 'basic')
+            assert.strictEqual(info.realm, 'Restricted')
+            callback('test', 'test')
+          })
+          request.on('response', (response) => {
+            let data = ''
+            response.pause()
+            response.on('data', (chunk) => {
+              data += chunk
+            })
+            response.on('end', () => {
+              assert.strictEqual(data, 'authenticated')
+              ses.clearAuthCache({ type: 'password' }).then(() => {
+                issueLoginRequest(attempt)
+              })
+            })
+            response.on('error', (error) => { done(error) })
+            response.resume()
+          })
+          // Internal api to bypass cache for testing.
+          request.urlRequest._setLoadFlags(1 << 1)
+          request.end()
+        }
+        issueLoginRequest()
+      })
+    })
+
+    // TODO(codebytere): remove when promisification complete
+    it('can clear http auth info from cache (callback)', (done) => {
       const ses = session.fromPartition('auth-cache')
       const server = http.createServer((req, res) => {
         const credentials = auth(req)
