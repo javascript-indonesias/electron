@@ -10,6 +10,7 @@
 #include "atom/common/native_mate_converters/string16_converter.h"
 #include "atom/common/native_mate_converters/value_converter.h"
 #include "atom/common/node_bindings.h"
+#include "atom/common/node_includes.h"
 #include "atom/common/options_switches.h"
 #include "atom/renderer/atom_render_frame_observer.h"
 #include "base/base_paths.h"
@@ -22,8 +23,6 @@
 #include "native_mate/dictionary.h"
 #include "third_party/blink/public/web/blink.h"
 #include "third_party/blink/public/web/web_document.h"
-
-#include "atom/common/node_includes.h"
 #include "third_party/electron_node/src/node_binding.h"
 #include "third_party/electron_node/src/node_native_module.h"
 
@@ -267,6 +266,30 @@ void AtomSandboxedRendererClient::SetupMainWorldOverrides(
 
   node::per_process::native_module_loader.CompileAndCall(
       context, "electron/js2c/isolated_bundle", &isolated_bundle_params,
+      &isolated_bundle_args, nullptr);
+}
+
+void AtomSandboxedRendererClient::SetupExtensionWorldOverrides(
+    v8::Handle<v8::Context> context,
+    content::RenderFrame* render_frame,
+    int world_id) {
+  auto* isolate = context->GetIsolate();
+
+  mate::Dictionary process = mate::Dictionary::CreateEmpty(isolate);
+  process.SetMethod("binding", GetBinding);
+
+  std::vector<v8::Local<v8::String>> isolated_bundle_params = {
+      node::FIXED_ONE_BYTE_STRING(isolate, "nodeProcess"),
+      node::FIXED_ONE_BYTE_STRING(isolate, "isolatedWorld"),
+      node::FIXED_ONE_BYTE_STRING(isolate, "worldId")};
+
+  std::vector<v8::Local<v8::Value>> isolated_bundle_args = {
+      process.GetHandle(),
+      GetContext(render_frame->GetWebFrame(), isolate)->Global(),
+      v8::Integer::New(isolate, world_id)};
+
+  node::per_process::native_module_loader.CompileAndCall(
+      context, "electron/js2c/content_script_bundle", &isolated_bundle_params,
       &isolated_bundle_args, nullptr);
 }
 
