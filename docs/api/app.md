@@ -896,11 +896,6 @@ app.setJumpList([
 
 Returns `Boolean`
 
-This method makes your application a Single Instance Application - instead of
-allowing multiple instances of your app to run, this will ensure that only a
-single instance of your app is running, and other instances signal this
-instance and exit.
-
 The return value of this method indicates whether or not this instance of your
 application successfully obtained the lock.  If it failed to obtain the lock,
 you can assume that another instance of your application is already running with
@@ -1183,6 +1178,14 @@ Show the app's about panel options. These options can be overridden with `app.se
 
 Set the about panel options. This will override the values defined in the app's
 `.plist` file on MacOS. See the [Apple docs][about-panel-options] for more details. On Linux, values must be set in order to be shown; there are no defaults.
+
+### `app.isEmojiPanelSupported`
+
+Returns `Boolean` - whether or not the current OS version allows for native emoji pickers.
+
+### `app.showEmojiPanel` _macOS_ _Windows_
+
+Show the platform's native emoji picker.
 
 ### `app.startAccessingSecurityScopedResource(bookmarkData)` _macOS (mas)_
 

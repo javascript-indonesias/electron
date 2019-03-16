@@ -505,9 +505,62 @@ mate::Handle<NativeImage> NativeImage::CreateFromPath(
 }
 
 // static
+mate::Handle<NativeImage> NativeImage::CreateFromBitmap(
+    mate::Arguments* args,
+    v8::Local<v8::Value> buffer,
+    const mate::Dictionary& options) {
+  if (!node::Buffer::HasInstance(buffer)) {
+    args->ThrowError("buffer must be a node Buffer");
+    return mate::Handle<NativeImage>();
+  }
+
+  unsigned int width = 0;
+  unsigned int height = 0;
+  double scale_factor = 1.;
+
+  if (!options.Get("width", &width)) {
+    args->ThrowError("width is required");
+    return mate::Handle<NativeImage>();
+  }
+
+  if (!options.Get("height", &height)) {
+    args->ThrowError("height is required");
+    return mate::Handle<NativeImage>();
+  }
+
+  auto info = SkImageInfo::MakeN32(width, height, kPremul_SkAlphaType);
+  auto size_bytes = info.computeMinByteSize();
+
+  if (size_bytes != node::Buffer::Length(buffer)) {
+    args->ThrowError("invalid buffer size");
+    return mate::Handle<NativeImage>();
+  }
+
+  options.Get("scaleFactor", &scale_factor);
+
+  if (width == 0 || height == 0) {
+    return CreateEmpty(args->isolate());
+  }
+
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(width, height, false);
+  bitmap.setPixels(node::Buffer::Data(buffer));
+
+  gfx::ImageSkia image_skia;
+  image_skia.AddRepresentation(gfx::ImageSkiaRep(bitmap, scale_factor));
+
+  return Create(args->isolate(), gfx::Image(image_skia));
+}
+
+// static
 mate::Handle<NativeImage> NativeImage::CreateFromBuffer(
     mate::Arguments* args,
     v8::Local<v8::Value> buffer) {
+  if (!node::Buffer::HasInstance(buffer)) {
+    args->ThrowError("buffer must be a node Buffer");
+    return mate::Handle<NativeImage>();
+  }
+
   int width = 0;
   int height = 0;
   double scale_factor = 1.;
@@ -606,18 +659,27 @@ bool Converter<mate::Handle<atom::api::NativeImage>>::FromV8(
 
 namespace {
 
+using atom::api::NativeImage;
+
 void Initialize(v8::Local<v8::Object> exports,
                 v8::Local<v8::Value> unused,
                 v8::Local<v8::Context> context,
                 void* priv) {
-  mate::Dictionary dict(context->GetIsolate(), exports);
-  dict.SetMethod("createEmpty", &atom::api::NativeImage::CreateEmpty);
-  dict.SetMethod("createFromPath", &atom::api::NativeImage::CreateFromPath);
-  dict.SetMethod("createFromBuffer", &atom::api::NativeImage::CreateFromBuffer);
-  dict.SetMethod("createFromDataURL",
-                 &atom::api::NativeImage::CreateFromDataURL);
-  dict.SetMethod("createFromNamedImage",
-                 &atom::api::NativeImage::CreateFromNamedImage);
+  v8::Isolate* isolate = context->GetIsolate();
+  mate::Dictionary dict(isolate, exports);
+  dict.Set("NativeImage", NativeImage::GetConstructor(isolate)
+                              ->GetFunction(context)
+                              .ToLocalChecked());
+  mate::Dictionary native_image = mate::Dictionary::CreateEmpty(isolate);
+  dict.Set("nativeImage", native_image);
+
+  native_image.SetMethod("createEmpty", &NativeImage::CreateEmpty);
+  native_image.SetMethod("createFromPath", &NativeImage::CreateFromPath);
+  native_image.SetMethod("createFromBitmap", &NativeImage::CreateFromBitmap);
+  native_image.SetMethod("createFromBuffer", &NativeImage::CreateFromBuffer);
+  native_image.SetMethod("createFromDataURL", &NativeImage::CreateFromDataURL);
+  native_image.SetMethod("createFromNamedImage",
+                         &NativeImage::CreateFromNamedImage);
 }
 
 }  // namespace

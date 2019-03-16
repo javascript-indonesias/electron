@@ -55,6 +55,14 @@ declare namespace Electron {
     sendToAll(webContentsId: number, channel: string, ...args: any[]): void
   }
 
+  interface RemoteInternal extends Electron.Remote {
+    getGuestWebContents(guestInstanceId: number): Electron.WebContents;
+  }
+
+  interface WebContentsInternal extends Electron.WebContents {
+    _sendInternal(channel: string, ...args: any[]): void;
+  }
+
   const deprecate: ElectronInternal.DeprecationUtil;
 }
 
@@ -67,6 +75,7 @@ declare namespace ElectronInternal {
     log(message: string): void;
     function(fn: Function, newName: string): Function;
     event(emitter: NodeJS.EventEmitter, oldName: string, newName: string): void;
+    fnToProperty<A extends Function, B extends Function>(propName: string, getterFn: A, setterFn: B): [A, B];
     removeProperty<T, K extends (keyof T & string)>(object: T, propertyName: K): T;
     renameProperty<T, K extends (keyof T & string)>(object: T, oldName: string, newName: K): T;
 

@@ -119,6 +119,17 @@ integration and can use node APIs like `require` and `process` to access low
 level system resources. Node integration is disabled by default in the guest
 page.
 
+### `nodeintegrationinsubframes`
+
+```html
+<webview src="http://www.google.com/" nodeintegrationinsubframes></webview>
+```
+
+Experimental option for enabling NodeJS support in sub-frames such as iframes
+inside the `webview`. All your preloads will load for every iframe, you can
+use `process.isMainFrame` to determine if you are in the main frame or not.
+This option is disabled by default in the guest page.
+
 ### `enableremotemodule`
 
 ```html
@@ -373,6 +384,23 @@ Injects CSS into the guest page.
 * `userGesture` Boolean (optional) - Default `false`.
 * `callback` Function (optional) - Called after script has been executed.
   * `result` Any
+
+Returns `Promise<any>` - A promise that resolves with the result of the executed code
+or is rejected if the result of the code is a rejected promise.
+
+Evaluates `code` in page. If `userGesture` is set, it will create the user
+gesture context in the page. HTML APIs like `requestFullScreen`, which require
+user action, can take advantage of this option for automation.
+
+**[Deprecated Soon](promisification.md)**
+
+### `<webview>.executeJavaScript(code[, userGesture])`
+
+* `code` String
+* `userGesture` Boolean (optional) - Default `false`.
+
+Returns `Promise<any>` - A promise that resolves with the result of the executed code
+or is rejected if the result of the code is a rejected promise.
 
 Evaluates `code` in page. If `userGesture` is set, it will create the user
 gesture context in the page. HTML APIs like `requestFullScreen`, which require
