@@ -6,7 +6,7 @@ const fs = require('fs')
 const path = require('path')
 const os = require('os')
 const { ipcRenderer, remote } = require('electron')
-const features = process.atomBinding('features')
+const features = process.electronBinding('features')
 
 const isCI = remote.getGlobal('isCi')
 chai.use(dirtyChai)
@@ -257,6 +257,34 @@ describe('node feature', () => {
       function errorDataListener (data) {
         output += data
         if (output.trim().startsWith('Debugger listening on ws://')) {
+          cleanup()
+          done()
+        }
+      }
+      function outDataHandler (data) {
+        cleanup()
+        done(new Error(`Unexpected output: ${data.toString()}`))
+      }
+      child.stderr.on('data', errorDataListener)
+      child.stdout.on('data', outDataHandler)
+    })
+
+    it('supports starting the v8 inspector with --inspect and a provided port', (done) => {
+      child = ChildProcess.spawn(process.execPath, ['--inspect=17364', path.join(__dirname, 'fixtures', 'module', 'run-as-node.js')], {
+        env: {
+          ELECTRON_RUN_AS_NODE: true
+        }
+      })
+
+      let output = ''
+      function cleanup () {
+        child.stderr.removeListener('data', errorDataListener)
+        child.stdout.removeListener('data', outDataHandler)
+      }
+      function errorDataListener (data) {
+        output += data
+        if (output.trim().startsWith('Debugger listening on ws://')) {
+          expect(output.trim()).to.contain(':17364', 'should be listening on port 17364')
           cleanup()
           done()
         }
