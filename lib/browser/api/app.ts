@@ -32,10 +32,7 @@ Object.assign(app, {
     getSwitchValue: (theSwitch: string) => commandLine.getSwitchValue(String(theSwitch)),
     appendSwitch: (theSwitch: string, value?: string) => commandLine.appendSwitch(String(theSwitch), typeof value === 'undefined' ? value : String(value)),
     appendArgument: (arg: string) => commandLine.appendArgument(String(arg))
-  } as Electron.CommandLine,
-  enableMixedSandbox () {
-    deprecate.log(`'enableMixedSandbox' is deprecated. Mixed-sandbox mode is now enabled by default. You can safely remove the call to enableMixedSandbox().`)
-  }
+  } as Electron.CommandLine
 })
 
 // we define this here because it'd be overly complicated to
@@ -94,6 +91,7 @@ app.getFileIcon = deprecate.promisify(app.getFileIcon)
 
 // Property Deprecations
 deprecate.fnToProperty(app, 'accessibilitySupportEnabled', '_isAccessibilitySupportEnabled', '_setAccessibilitySupportEnabled')
+deprecate.fnToProperty(app, 'badgeCount', '_getBadgeCount', '_setBadgeCount')
 
 // Wrappers for native classes.
 const { DownloadItem } = process.electronBinding('download_item')
