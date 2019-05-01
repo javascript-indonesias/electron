@@ -610,29 +610,6 @@ You can request the following paths by the name:
 * `logs` Directory for your app's log folder.
 * `pepperFlashSystemPlugin` Full path to the system version of the Pepper Flash plugin.
 
-### `app.getFileIcon(path[, options], callback)`
-
-* `path` String
-* `options` Object (optional)
-  * `size` String
-    * `small` - 16x16
-    * `normal` - 32x32
-    * `large` - 48x48 on _Linux_, 32x32 on _Windows_, unsupported on _macOS_.
-* `callback` Function
-  * `error` Error
-  * `icon` [NativeImage](native-image.md)
-
-Fetches a path's associated icon.
-
-On _Windows_, there are 2 kinds of icons:
-
-* Icons associated with certain file extensions, like `.mp3`, `.png`, etc.
-* Icons inside the file itself, like `.exe`, `.dll`, `.ico`.
-
-On _Linux_ and _macOS_, icons depend on the application associated with file mime type.
-
-**[Deprecated Soon](modernization/promisification.md)**
-
 ### `app.getFileIcon(path[, options])`
 
 * `path` String
@@ -684,11 +661,15 @@ to the npm modules spec. You should usually also specify a `productName`
 field, which is your application's full capitalized name, and which will be
 preferred over `name` by Electron.
 
+**[Deprecated Soon](modernization/property-updates.md)**
+
 ### `app.setName(name)`
 
 * `name` String
 
 Overrides the current application's name.
+
+**[Deprecated Soon](modernization/property-updates.md)**
 
 ### `app.getLocale()`
 
@@ -1389,3 +1370,12 @@ A `Boolean` property that returns  `true` if the app is packaged, `false` otherw
 [Squirrel-Windows]: https://github.com/Squirrel/Squirrel.Windows
 [JumpListBeginListMSDN]: https://msdn.microsoft.com/en-us/library/windows/desktop/dd378398(v=vs.85).aspx
 [about-panel-options]: https://developer.apple.com/reference/appkit/nsapplication/1428479-orderfrontstandardaboutpanelwith?language=objc
+
+### `app.name`
+
+A `String` property that indicates the current application's name, which is the name in the application's `package.json` file.
+
+Usually the `name` field of `package.json` is a short lowercased name, according
+to the npm modules spec. You should usually also specify a `productName`
+field, which is your application's full capitalized name, and which will be
+preferred over `name` by Electron.

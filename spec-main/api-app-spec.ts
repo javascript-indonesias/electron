@@ -84,19 +84,35 @@ describe('app module', () => {
     })
   })
 
+  describe('app.name', () => {
+    it('returns the name field of package.json', () => {
+      expect(app.name).to.equal('Electron Test Main')
+    })
+
+    it('overrides the name', () => {
+      expect(app.name).to.equal('Electron Test Main')
+      app.name = 'test-name'
+
+      expect(app.name).to.equal('test-name')
+      app.name = 'Electron Test Main'
+    })
+  })
+
+  // TODO(codebytere): remove when propertyification is complete
   describe('app.getName()', () => {
     it('returns the name field of package.json', () => {
       expect(app.getName()).to.equal('Electron Test Main')
     })
   })
 
+  // TODO(codebytere): remove when propertyification is complete
   describe('app.setName(name)', () => {
     it('overrides the name', () => {
       expect(app.getName()).to.equal('Electron Test Main')
       app.setName('test-name')
 
       expect(app.getName()).to.equal('test-name')
-      app.setName('Electron Test')
+      app.setName('Electron Test Main')
     })
   })
 
@@ -386,7 +402,10 @@ describe('app module', () => {
       w = new BrowserWindow({ show: false })
     })
 
-    it('should emit renderer-process-crashed event when renderer crashes', async () => {
+    it('should emit renderer-process-crashed event when renderer crashes', async function() {
+      // FIXME: re-enable this test on win32.
+      if (process.platform === 'win32')
+        return this.skip()
       w = new BrowserWindow({
         show: false,
         webPreferences: {
@@ -412,7 +431,7 @@ describe('app module', () => {
       await w.loadURL('about:blank')
 
       const promise = emittedOnce(app, 'desktop-capturer-get-sources')
-      w.webContents.executeJavaScript(`require('electron').desktopCapturer.getSources({ types: ['screen'] }, () => {})`)
+      w.webContents.executeJavaScript(`require('electron').desktopCapturer.getSources({ types: ['screen'] })`)
 
       const [, webContents] = await promise
       expect(webContents).to.equal(w.webContents)
@@ -856,33 +875,12 @@ describe('app module', () => {
       expect(icon.isEmpty()).to.equal(false)
     })
 
-    // TODO(codebytere): remove when promisification is complete
-    it('fetches a non-empty icon (callback)', (done) => {
-      app.getFileIcon(iconPath, (error, icon) => {
-        expect(error).to.equal(null)
-        expect(icon.isEmpty()).to.equal(false)
-        done()
-      })
-    })
-
     it('fetches normal icon size by default', async () => {
       const icon = await app.getFileIcon(iconPath)
       const size = icon.getSize()
 
       expect(size.height).to.equal(sizes.normal)
       expect(size.width).to.equal(sizes.normal)
-    })
-
-    // TODO(codebytere): remove when promisification is complete
-    it('fetches normal icon size by default (callback)', (done) => {
-      app.getFileIcon(iconPath, (error, icon) => {
-        expect(error).to.equal(null)
-        const size = icon.getSize()
-
-        expect(size.height).to.equal(sizes.normal)
-        expect(size.width).to.equal(sizes.normal)
-        done()
-      })
     })
 
     describe('size option', () => {
@@ -900,18 +898,6 @@ describe('app module', () => {
 
         expect(size.height).to.equal(sizes.normal)
         expect(size.width).to.equal(sizes.normal)
-      })
-
-      // TODO(codebytere): remove when promisification is complete
-      it('fetches a normal icon (callback)', (done) => {
-        app.getFileIcon(iconPath, { size: 'normal' }, (error, icon) => {
-          expect(error).to.equal(null)
-          const size = icon.getSize()
-
-          expect(size.height).to.equal(sizes.normal)
-          expect(size.width).to.equal(sizes.normal)
-          done()
-        })
       })
 
       it('fetches a large icon', async () => {

@@ -46,6 +46,9 @@ class EventEmitter : public Wrappable<T> {
   v8::Local<v8::Object> GetWrapper() const {
     return Wrappable<T>::GetWrapper();
   }
+  v8::MaybeLocal<v8::Object> GetWrapper(v8::Isolate* isolate) const {
+    return Wrappable<T>::GetWrapper(isolate);
+  }
 
   // this.emit(name, event, args...);
   template <typename... Args>
@@ -105,8 +108,13 @@ class EventEmitter : public Wrappable<T> {
     v8::HandleScope handle_scope(isolate());
     EmitEvent(isolate(), GetWrapper(), name, event,
               std::forward<Args>(args)...);
-    return event->Get(StringToV8(isolate(), "defaultPrevented"))
-        ->BooleanValue(isolate());
+    auto context = isolate()->GetCurrentContext();
+    v8::Local<v8::Value> defaultPrevented;
+    if (event->Get(context, StringToV8(isolate(), "defaultPrevented"))
+            .ToLocal(&defaultPrevented)) {
+      return defaultPrevented->BooleanValue(isolate());
+    }
+    return false;
   }
 
   DISALLOW_COPY_AND_ASSIGN(EventEmitter);

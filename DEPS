@@ -10,7 +10,7 @@ gclient_gn_args = [
 
 vars = {
   'chromium_version':
-    '1e9f9a24aa12bea9cf194a82a7e249bd1242ec4f',
+    '7dff37844cb359ec96a63c4526574ec71138c2ec',
   'node_version':
     '696d8fb66d6f65fc82869d390e0d2078970b1eb4',
 
@@ -23,6 +23,9 @@ vars = {
   'electron_git': 'https://github.com/electron',
   'requests_git': 'https://github.com/kennethreitz',
   'yaml_git': 'https://github.com/yaml',
+
+  # KEEP IN SYNC WITH spec-runner FILE
+  'yarn_version': '1.15.2',
 
   # To be able to build clean Chromium from sources.
   'apply_patches': True,
@@ -110,7 +113,7 @@ hooks = [
     'action': [
       'python',
       '-c',
-      'import os, subprocess; os.chdir(os.path.join("src", "electron")); subprocess.check_call(["python", "script/lib/npm.py", "install"]);',
+      'import os, subprocess; os.chdir(os.path.join("src", "electron")); subprocess.check_call(["python", "script/lib/npx.py", "yarn@' + (Var("yarn_version")) + '", "install", "--frozen-lockfile"]);',
     ],
   },
   {
