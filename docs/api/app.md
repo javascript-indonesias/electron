@@ -404,8 +404,10 @@ Returns:
 * `workingDirectory` String - The second instance's working directory
 
 This event will be emitted inside the primary instance of your application
-when a second instance has been executed. `argv` is an Array of the second instance's
-command line arguments, and `workingDirectory` is its current working directory. Usually
+when a second instance has been executed and calls `app.requestSingleInstanceLock()`.
+
+`argv` is an Array of the second instance's command line arguments,
+and `workingDirectory` is its current working directory. Usually
 applications respond to this by making their primary window focused and
 non-minimized.
 
@@ -688,7 +690,7 @@ To set the locale, you'll want to use a command line switch at app startup, whic
 
 ### `app.getLocaleCountryCode()`
 
-Returns `string` - User operating system's locale two-letter [ISO 3166](https://www.iso.org/iso-3166-country-codes.html) country code. The value is taken from native OS APIs.
+Returns `String` - User operating system's locale two-letter [ISO 3166](https://www.iso.org/iso-3166-country-codes.html) country code. The value is taken from native OS APIs.
 
 **Note:** When unable to detect locale country code, it returns empty string.
 
