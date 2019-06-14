@@ -19,7 +19,6 @@ let window = null
 
 // will be used by crash-reporter spec.
 process.port = 0
-process.crashServicePid = 0
 
 v8.setFlagsFromString('--expose_gc')
 app.commandLine.appendSwitch('js-flags', '--expose_gc')
@@ -53,16 +52,15 @@ if (process.platform !== 'darwin') {
 
 // Write output to file if OUTPUT_TO_FILE is defined.
 const outputToFile = process.env.OUTPUT_TO_FILE
-const print = function (_, args) {
+const print = function (_, method, args) {
   const output = util.format.apply(null, args)
   if (outputToFile) {
     fs.appendFileSync(outputToFile, output + '\n')
   } else {
-    console.error(output)
+    console[method](output)
   }
 }
-ipcMain.on('console.log', print)
-ipcMain.on('console.error', print)
+ipcMain.on('console-call', print)
 
 ipcMain.on('process.exit', function (event, code) {
   process.exit(code)
@@ -297,11 +295,6 @@ ipcMain.on('handle-unhandled-rejection', (event, message) => {
   fs.readFile(__filename, () => {
     Promise.reject(new Error(message))
   })
-})
-
-ipcMain.on('crash-service-pid', (event, pid) => {
-  process.crashServicePid = pid
-  event.returnValue = null
 })
 
 // Suspend listeners until the next event and then restore them
