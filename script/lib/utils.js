@@ -28,8 +28,7 @@ function getAbsoluteElectronExec () {
 async function handleGitCall (args, gitDir) {
   const details = await GitProcess.exec(args, gitDir)
   if (details.exitCode === 0) {
-    const output = details.stdout.replace(/^\*|\s+|\s+$/, '')
-    return output.trim()
+    return details.stdout.replace(/^\*|\s+|\s+$/, '')
   } else {
     const error = GitProcess.parseError(details.stderr)
     console.log(`${fail} couldn't parse git process call: `, error)
@@ -41,14 +40,21 @@ async function getCurrentBranch (gitDir) {
   let branch = await handleGitCall(['rev-parse', '--abbrev-ref', 'HEAD'], gitDir)
   if (branch !== 'master' && !branch.match(/[0-9]+-[0-9]+-x/)) {
     const lastCommit = await handleGitCall(['rev-parse', 'HEAD'], gitDir)
-    const branches = (await handleGitCall(['branch', '--contains', lastCommit], gitDir)).split('\n')
+    const branches = (await handleGitCall([
+      'branch',
+      '--contains',
+      lastCommit,
+      '--remote'
+    ], gitDir)).split('\n')
+
     branch = branches.filter(b => b === 'master' || b.match(/[0-9]+-[0-9]+-x/))[0]
     if (!branch) {
       console.log(`${fail} no release branch exists for this ref`)
       process.exit(1)
     }
+    if (branch.startsWith('origin/')) branch = branch.substr('origin/'.length)
   }
-  return branch
+  return branch.trim()
 }
 
 module.exports = {
