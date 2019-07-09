@@ -198,7 +198,8 @@ It creates a new `BrowserWindow` with native properties as set by the `options`.
   * `autoHideMenuBar` Boolean (optional) - Auto hide the menu bar unless the `Alt`
     key is pressed. Default is `false`.
   * `enableLargerThanScreen` Boolean (optional) - Enable the window to be resized larger
-    than screen. Default is `false`.
+    than screen. Only relevant for macOS, as other OSes allow
+    larger-than-screen windows by default. Default is `false`.
   * `backgroundColor` String (optional) - Window's background color as a hexadecimal value,
     like `#66CD00` or `#FFF` or `#80FFFFFF` (alpha in #AARRGGBB format is supported if
     `transparent` is set to `true`). Default is `#FFF` (white).
@@ -1551,11 +1552,13 @@ Prevents the window contents from being captured by other apps.
 On macOS it sets the NSWindow's sharingType to NSWindowSharingNone.
 On Windows it calls SetWindowDisplayAffinity with `WDA_MONITOR`.
 
-#### `win.setFocusable(focusable)` _Windows_
+#### `win.setFocusable(focusable)` _macOS_ _Windows_
 
 * `focusable` Boolean
 
 Changes whether the window can be focused.
+
+On macOS it does not remove the focus from the window.
 
 #### `win.setParentWindow(parent)`
 
@@ -1611,8 +1614,8 @@ Adds a window as a tab on this window, after the tab for the window instance.
 
 #### `win.setVibrancy(type)` _macOS_
 
-* `type` String - Can be `appearance-based`, `light`, `dark`, `titlebar`,
-`selection`, `menu`, `popover`, `sidebar`, `medium-light` or `ultra-dark`. See
+* `type` String | null - Can be `appearance-based`, `light`, `dark`, `titlebar`,
+  `selection`, `menu`, `popover`, `sidebar`, `medium-light` or `ultra-dark`. See
   the [macOS documentation][vibrancy-docs] for more details.
 
 Adds a vibrancy effect to the browser window. Passing `null` or an empty string
