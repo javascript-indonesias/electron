@@ -28,6 +28,7 @@
 #include "shell/browser/ui/cocoa/NSColor+Hex.h"
 #include "shell/common/native_mate_converters/gurl_converter.h"
 #include "shell/common/native_mate_converters/value_converter.h"
+#include "ui/native_theme/native_theme.h"
 
 namespace mate {
 template <>
@@ -218,14 +219,12 @@ int SystemPreferences::DoSubscribeNotification(
 
                 if (user_info) {
                   copied_callback.Run(
-                      base::SysNSStringToUTF8(notification.name),
-                      *user_info,
+                      base::SysNSStringToUTF8(notification.name), *user_info,
                       object);
                 } else {
                   copied_callback.Run(
                       base::SysNSStringToUTF8(notification.name),
-                      base::DictionaryValue(),
-                      object);
+                      base::DictionaryValue(), object);
                 }
               }];
   return request_id;
@@ -638,8 +637,7 @@ void SystemPreferences::RemoveUserDefault(const std::string& name) {
 
 bool SystemPreferences::IsDarkMode() {
   if (@available(macOS 10.14, *)) {
-    return [[NSApplication sharedApplication].effectiveAppearance.name
-        isEqualToString:NSAppearanceNameDarkAqua];
+    return ui::NativeTheme::GetInstanceForNativeUi()->SystemDarkModeEnabled();
   }
   NSString* mode = [[NSUserDefaults standardUserDefaults]
       stringForKey:@"AppleInterfaceStyle"];

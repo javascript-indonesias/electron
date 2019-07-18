@@ -73,15 +73,6 @@ std::vector<std::string> ParseSchemesCLISwitch(base::CommandLine* command_line,
                            base::SPLIT_WANT_NONEMPTY);
 }
 
-void SetHiddenValue(v8::Handle<v8::Context> context,
-                    const base::StringPiece& key,
-                    v8::Local<v8::Value> value) {
-  v8::Isolate* isolate = context->GetIsolate();
-  v8::Local<v8::Private> privateKey =
-      v8::Private::ForApi(isolate, mate::StringToV8(isolate, key));
-  context->Global()->SetPrivate(context, privateKey, value);
-}
-
 }  // namespace
 
 RendererClientBase::RendererClientBase() {
@@ -110,14 +101,13 @@ void RendererClientBase::DidCreateScriptContext(
   // global.setHidden("contextId", `${processHostId}-${++next_context_id_}`)
   auto context_id = base::StringPrintf(
       "%s-%" PRId64, renderer_client_id_.c_str(), ++next_context_id_);
-  v8::Isolate* isolate = context->GetIsolate();
-  SetHiddenValue(context, "contextId", mate::ConvertToV8(isolate, context_id));
+  mate::Dictionary global(context->GetIsolate(), context->Global());
+  global.SetHidden("contextId", context_id);
 
   auto* command_line = base::CommandLine::ForCurrentProcess();
   bool enableRemoteModule =
       !command_line->HasSwitch(switches::kDisableRemoteModule);
-  SetHiddenValue(context, "enableRemoteModule",
-                 mate::ConvertToV8(isolate, enableRemoteModule));
+  global.SetHidden("enableRemoteModule", enableRemoteModule);
 }
 
 void RendererClientBase::AddRenderBindings(
@@ -318,6 +308,30 @@ v8::Local<v8::Value> RendererClientBase::RunScript(
   if (!maybe_script.ToLocal(&script))
     return v8::Local<v8::Value>();
   return script->Run(context).ToLocalChecked();
+}
+
+bool RendererClientBase::IsWebViewFrame(
+    v8::Handle<v8::Context> context,
+    content::RenderFrame* render_frame) const {
+  auto* isolate = context->GetIsolate();
+
+  if (render_frame->IsMainFrame())
+    return false;
+
+  mate::Dictionary window_dict(
+      isolate, GetContext(render_frame->GetWebFrame(), isolate)->Global());
+
+  v8::Local<v8::Object> frame_element;
+  if (!window_dict.Get("frameElement", &frame_element))
+    return false;
+
+  mate::Dictionary frame_element_dict(isolate, frame_element);
+
+  v8::Local<v8::Object> internal;
+  if (!frame_element_dict.GetHidden("internal", &internal))
+    return false;
+
+  return !internal.IsEmpty();
 }
 
 }  // namespace electron
