@@ -978,7 +978,7 @@ Closes the currently open [Quick Look][quick-look] panel.
 
 #### `win.setBounds(bounds[, animate])`
 
-* `bounds` [Rectangle](structures/rectangle.md)
+* `bounds` Partial<[Rectangle](structures/rectangle.md)>
 * `animate` Boolean (optional) _macOS_
 
 Resizes and moves the window to the supplied bounds. Any properties that are not supplied will default to their current values.
@@ -1716,7 +1716,7 @@ removed in future Electron releases.
 
 #### `win.setBrowserView(browserView)` _Experimental_
 
-* `browserView` [BrowserView](browser-view.md) - Attach browserView to win.
+* `browserView` [BrowserView](browser-view.md) | null - Attach browserView to win.
 If there is some other browserViews was attached they will be removed from
 this window.
 
@@ -1737,8 +1737,8 @@ Replacement API for setBrowserView supporting work with multi browser views.
 
 #### `win.getBrowserViews()` _Experimental_
 
-Returns array of `BrowserView` what was an attached with addBrowserView
-or setBrowserView.
+Returns `BrowserView[]` - an array of all BrowserViews that have been attached
+with `addBrowserView` or `setBrowserView`.
 
 **Note:** The BrowserView API is currently experimental and may change or be
 removed in future Electron releases.
