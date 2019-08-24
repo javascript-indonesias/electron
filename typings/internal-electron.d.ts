@@ -63,6 +63,7 @@ declare namespace Electron {
   }
 
   interface IpcRendererInternal extends Electron.IpcRenderer {
+    invoke<T>(channel: string, ...args: any[]): Promise<T>;
     sendToAll(webContentsId: number, channel: string, ...args: any[]): void
   }
 
@@ -126,8 +127,17 @@ declare namespace ElectronInternal {
   }
 
   interface IpcMainInternal extends NodeJS.EventEmitter {
+    handle(channel: string, listener: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => Promise<any> | any): void;
     on(channel: string, listener: (event: IpcMainInternalEvent, ...args: any[]) => void): this;
     once(channel: string, listener: (event: IpcMainInternalEvent, ...args: any[]) => void): this;
+  }
+
+  type ModuleLoader = () => any;
+
+  interface ModuleEntry {
+    name: string;
+    private?: boolean;
+    loader: ModuleLoader;
   }
 
   interface WebFrameInternal extends Electron.WebFrame {

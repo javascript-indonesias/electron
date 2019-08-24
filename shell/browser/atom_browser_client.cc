@@ -402,6 +402,9 @@ void AtomBrowserClient::OverrideWebkitPrefs(content::RenderViewHost* host,
   prefs->default_minimum_page_scale_factor = 1.f;
   prefs->default_maximum_page_scale_factor = 1.f;
   prefs->navigate_on_drag_drop = false;
+#if !BUILDFLAG(ENABLE_PICTURE_IN_PICTURE)
+  prefs->picture_in_picture_enabled = false;
+#endif
 
   ui::NativeTheme* native_theme = ui::NativeTheme::GetInstanceForNativeUi();
   prefs->preferred_color_scheme = native_theme->ShouldUseDarkColors()
@@ -684,6 +687,14 @@ bool AtomBrowserClient::CanCreateWindow(
   return false;
 }
 
+#if BUILDFLAG(ENABLE_PICTURE_IN_PICTURE)
+std::unique_ptr<content::OverlayWindow>
+AtomBrowserClient::CreateWindowForPictureInPicture(
+    content::PictureInPictureWindowController* controller) {
+  return content::OverlayWindow::Create(controller);
+}
+#endif
+
 void AtomBrowserClient::GetAdditionalAllowedSchemesForFileSystem(
     std::vector<std::string>* additional_schemes) {
   auto schemes_list = api::GetStandardSchemes();
@@ -756,11 +767,6 @@ AtomBrowserClient::GetServiceManifestOverlay(base::StringPiece name) {
   if (name == content::mojom::kBrowserServiceName)
     return GetElectronContentBrowserOverlayManifest();
   return base::nullopt;
-}
-
-std::vector<service_manager::Manifest>
-AtomBrowserClient::GetExtraServiceManifests() {
-  return GetElectronBuiltinServiceManifests();
 }
 
 std::unique_ptr<content::BrowserMainParts>
@@ -972,8 +978,7 @@ bool AtomBrowserClient::WillCreateURLLoaderFactory(
     content::BrowserContext* browser_context,
     content::RenderFrameHost* frame_host,
     int render_process_id,
-    bool is_navigation,
-    bool is_download,
+    URLLoaderFactoryType type,
     const url::Origin& request_initiator,
     mojo::PendingReceiver<network::mojom::URLLoaderFactory>* factory_receiver,
     network::mojom::TrustedURLLoaderHeaderClientPtrInfo* header_client,
@@ -1067,6 +1072,13 @@ std::string AtomBrowserClient::GetApplicationLocale() {
   if (BrowserThread::CurrentlyOn(BrowserThread::IO))
     return g_io_thread_application_locale.Get();
   return *g_application_locale;
+}
+
+base::FilePath AtomBrowserClient::GetFontLookupTableCacheDir() {
+  base::FilePath user_data_dir;
+  base::PathService::Get(DIR_USER_DATA, &user_data_dir);
+  DCHECK(!user_data_dir.empty());
+  return user_data_dir.Append(FILE_PATH_LITERAL("FontLookupTableCache"));
 }
 
 bool AtomBrowserClient::ShouldEnableStrictSiteIsolation() {
