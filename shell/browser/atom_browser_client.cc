@@ -197,8 +197,9 @@ content::WebContents* AtomBrowserClient::GetWebContentsFromProcessID(
     int process_id) {
   // If the process is a pending process, we should use the web contents
   // for the frame host passed into RegisterPendingProcess.
-  if (base::Contains(pending_processes_, process_id))
-    return pending_processes_[process_id];
+  const auto iter = pending_processes_.find(process_id);
+  if (iter != std::end(pending_processes_))
+    return iter->second;
 
   // Certain render process will be created with no associated render view,
   // for example: ServiceWorker.
@@ -561,9 +562,6 @@ void AtomBrowserClient::AppendExtraCommandLineSwitches(
 
   content::WebContents* web_contents = GetWebContentsFromProcessID(process_id);
   if (web_contents) {
-    if (web_contents->GetVisibleURL().SchemeIs("devtools")) {
-      command_line->AppendSwitch(switches::kDisableRemoteModule);
-    }
     auto* web_preferences = WebContentsPreferences::From(web_contents);
     if (web_preferences)
       web_preferences->AppendCommandLineSwitches(

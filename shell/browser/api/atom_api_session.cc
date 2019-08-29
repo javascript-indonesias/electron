@@ -19,6 +19,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/common/pref_names.h"
 #include "components/download/public/common/download_danger_type.h"
+#include "components/download/public/common/download_url_parameters.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/value_map_pref_store.h"
 #include "components/proxy_config/proxy_config_dictionary.h"
@@ -489,8 +490,10 @@ void Session::AllowNTLMCredentialsForDomains(const std::string& domains) {
 
 void Session::SetUserAgent(const std::string& user_agent,
                            mate::Arguments* args) {
-  CHECK(false)
-      << "TODO: This was disabled when the network service was turned on";
+  browser_context_->SetUserAgent(user_agent);
+  content::BrowserContext::GetDefaultStoragePartition(browser_context_.get())
+      ->GetNetworkContext()
+      ->SetUserAgent(user_agent);
 }
 
 std::string Session::GetUserAgent() {
@@ -508,6 +511,14 @@ v8::Local<v8::Promise> Session::GetBlobData(v8::Isolate* isolate,
       base::BindOnce(&AtomBlobReader::StartReading,
                      base::Unretained(blob_reader), uuid, std::move(promise)));
   return handle;
+}
+
+void Session::DownloadURL(const GURL& url) {
+  auto* download_manager =
+      content::BrowserContext::GetDownloadManager(browser_context());
+  auto download_params = std::make_unique<download::DownloadUrlParameters>(
+      url, MISSING_TRAFFIC_ANNOTATION);
+  download_manager->DownloadUrl(std::move(download_params));
 }
 
 void Session::CreateInterruptedDownload(const mate::Dictionary& options) {
@@ -694,6 +705,7 @@ void Session::BuildPrototype(v8::Isolate* isolate,
       .SetMethod("setUserAgent", &Session::SetUserAgent)
       .SetMethod("getUserAgent", &Session::GetUserAgent)
       .SetMethod("getBlobData", &Session::GetBlobData)
+      .SetMethod("downloadURL", &Session::DownloadURL)
       .SetMethod("createInterruptedDownload",
                  &Session::CreateInterruptedDownload)
       .SetMethod("setPreloads", &Session::SetPreloads)
