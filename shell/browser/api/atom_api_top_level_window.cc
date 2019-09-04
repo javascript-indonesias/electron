@@ -889,6 +889,10 @@ void TopLevelWindow::CloseFilePreview() {
   window_->CloseFilePreview();
 }
 
+void TopLevelWindow::SetGTKDarkThemeEnabled(bool use_dark_theme) {
+  window_->SetGTKDarkThemeEnabled(use_dark_theme);
+}
+
 v8::Local<v8::Value> TopLevelWindow::GetContentView() const {
   if (content_view_.IsEmpty())
     return v8::Null(isolate());
@@ -1060,8 +1064,8 @@ mate::WrappableBase* TopLevelWindow::New(mate::Arguments* args) {
 void TopLevelWindow::BuildPrototype(v8::Isolate* isolate,
                                     v8::Local<v8::FunctionTemplate> prototype) {
   prototype->SetClassName(mate::StringToV8(isolate, "TopLevelWindow"));
+  gin_helper::Destroyable::MakeDestroyable(isolate, prototype);
   mate::ObjectTemplateBuilder(isolate, prototype->PrototypeTemplate())
-      .MakeDestroyable()
       .SetMethod("setContentView", &TopLevelWindow::SetContentView)
       .SetMethod("close", &TopLevelWindow::Close)
       .SetMethod("focus", &TopLevelWindow::Focus)
