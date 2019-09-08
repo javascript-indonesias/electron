@@ -20,13 +20,15 @@
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
-#include "native_mate/dictionary.h"
+#include "gin/dictionary.h"
 #include "net/base/directory_lister.h"
 #include "net/base/mime_util.h"
 #include "shell/browser/atom_browser_context.h"
 #include "shell/browser/native_window.h"
 #include "shell/browser/ui/file_dialog.h"
-#include "shell/common/native_mate_converters/once_callback.h"
+#include "shell/common/gin_converters/callback_converter.h"
+#include "shell/common/gin_converters/file_path_converter.h"
+#include "shell/common/gin_helper/dictionary.h"
 #include "ui/shell_dialogs/selected_file_info.h"
 
 using blink::mojom::FileChooserFileInfo;
@@ -54,7 +56,7 @@ class FileSelectHelper : public base::RefCounted<FileSelectHelper>,
 
   void ShowOpenDialog(const file_dialog::DialogSettings& settings) {
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    electron::util::Promise<mate::Dictionary> promise(isolate);
+    electron::util::Promise<gin_helper::Dictionary> promise(isolate);
 
     auto callback = base::BindOnce(&FileSelectHelper::OnOpenDialogDone, this);
     ignore_result(promise.Then(std::move(callback)));
@@ -64,7 +66,7 @@ class FileSelectHelper : public base::RefCounted<FileSelectHelper>,
 
   void ShowSaveDialog(const file_dialog::DialogSettings& settings) {
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    electron::util::Promise<mate::Dictionary> promise(isolate);
+    electron::util::Promise<gin_helper::Dictionary> promise(isolate);
 
     auto callback = base::BindOnce(&FileSelectHelper::OnSaveDialogDone, this);
     ignore_result(promise.Then(std::move(callback)));
@@ -115,7 +117,7 @@ class FileSelectHelper : public base::RefCounted<FileSelectHelper>,
     AddRef();
   }
 
-  void OnOpenDialogDone(mate::Dictionary result) {
+  void OnOpenDialogDone(gin_helper::Dictionary result) {
     std::vector<FileChooserFileInfoPtr> file_info;
     bool canceled = true;
     result.Get("canceled", &canceled);
@@ -157,7 +159,7 @@ class FileSelectHelper : public base::RefCounted<FileSelectHelper>,
     }
   }
 
-  void OnSaveDialogDone(mate::Dictionary result) {
+  void OnSaveDialogDone(gin_helper::Dictionary result) {
     std::vector<FileChooserFileInfoPtr> file_info;
     bool canceled = true;
     result.Get("canceled", &canceled);
