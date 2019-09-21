@@ -90,6 +90,7 @@ void AtomDownloadManagerDelegate::OnDownloadPathGenerated(
     const content::DownloadTargetCallback& callback,
     const base::FilePath& default_path) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  base::ThreadRestrictions::ScopedAllowIO allow_io;
 
   auto* item = download_manager_->GetDownload(download_id);
   if (!item)
@@ -216,9 +217,9 @@ bool AtomDownloadManagerDelegate::DetermineDownloadTarget(
   base::FilePath default_download_path =
       browser_context->prefs()->GetFilePath(prefs::kDownloadDefaultDirectory);
 
-  base::PostTaskWithTraitsAndReplyWithResult(
+  base::PostTaskAndReplyWithResult(
       FROM_HERE,
-      {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
+      {base::ThreadPool(), base::MayBlock(), base::TaskPriority::BEST_EFFORT,
        base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN},
       base::BindOnce(&CreateDownloadPath, download->GetURL(),
                      download->GetContentDisposition(),

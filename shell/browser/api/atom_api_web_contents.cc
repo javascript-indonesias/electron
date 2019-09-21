@@ -46,7 +46,7 @@
 #include "mojo/public/cpp/system/platform_handle.h"
 #include "native_mate/converter.h"
 #include "native_mate/dictionary.h"
-#include "native_mate/object_template_builder.h"
+#include "native_mate/object_template_builder_deprecated.h"
 #include "shell/browser/api/atom_api_browser_window.h"
 #include "shell/browser/api/atom_api_debugger.h"
 #include "shell/browser/api/atom_api_session.h"
@@ -313,6 +313,25 @@ void OnCapturePageDone(util::Promise<gfx::Image> promise,
   promise.Resolve(gfx::Image::CreateFrom1xBitmap(bitmap));
 }
 
+base::Optional<base::TimeDelta> GetCursorBlinkInterval() {
+#if defined(OS_MACOSX)
+  base::TimeDelta interval;
+  if (ui::TextInsertionCaretBlinkPeriod(&interval))
+    return interval;
+#elif defined(OS_LINUX)
+  if (auto* linux_ui = views::LinuxUI::instance())
+    return linux_ui->GetCursorBlinkInterval();
+#elif defined(OS_WIN)
+  const auto system_msec = ::GetCaretBlinkTime();
+  if (system_msec != 0) {
+    return (system_msec == INFINITE)
+               ? base::TimeDelta()
+               : base::TimeDelta::FromMilliseconds(system_msec);
+  }
+#endif
+  return base::nullopt;
+}
+
 }  // namespace
 
 WebContents::WebContents(v8::Isolate* isolate,
@@ -467,24 +486,9 @@ void WebContents::InitWithSessionAndOptions(
   prefs->subpixel_rendering = params->subpixel_rendering;
 #endif
 
-// Honor the system's cursor blink rate settings
-#if defined(OS_MACOSX)
-  base::TimeDelta interval;
-  if (ui::TextInsertionCaretBlinkPeriod(&interval))
-    prefs->caret_blink_interval = interval;
-#elif defined(OS_LINUX)
-  views::LinuxUI* linux_ui = views::LinuxUI::instance();
-  if (linux_ui)
-    prefs->caret_blink_interval = linux_ui->GetCursorBlinkInterval();
-#elif defined(OS_WIN)
-  const auto system_msec = ::GetCaretBlinkTime();
-  if (system_msec != 0) {
-    prefs->caret_blink_interval =
-        (system_msec == INFINITE)
-            ? base::TimeDelta()
-            : base::TimeDelta::FromMilliseconds(system_msec);
-  }
-#endif
+  // Honor the system's cursor blink rate settings
+  if (auto interval = GetCursorBlinkInterval())
+    prefs->caret_blink_interval = *interval;
 
   // Save the preferences in C++.
   new WebContentsPreferences(web_contents(), options);
@@ -844,9 +848,8 @@ void WebContents::BeforeUnloadFired(bool proceed,
 }
 
 void WebContents::RenderViewCreated(content::RenderViewHost* render_view_host) {
-  auto* const impl = content::RenderWidgetHostImpl::FromID(
-      render_view_host->GetProcess()->GetID(),
-      render_view_host->GetRoutingID());
+  auto* impl = static_cast<content::RenderWidgetHostImpl*>(
+      render_view_host->GetWidget());
   if (impl)
     impl->disable_hidden_ = !background_throttling_;
 }

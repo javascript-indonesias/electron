@@ -54,10 +54,6 @@
 #include "chrome/renderer/pepper/pepper_helper.h"
 #endif  // BUILDFLAG(ENABLE_PEPPER_FLASH)
 
-#if BUILDFLAG(ENABLE_TTS)
-#include "chrome/renderer/tts_dispatcher.h"
-#endif  // BUILDFLAG(ENABLE_TTS)
-
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "components/printing/renderer/print_render_frame_helper.h"
 #include "printing/print_settings.h"
@@ -117,10 +113,12 @@ void RendererClientBase::DidCreateScriptContext(
   gin_helper::Dictionary global(context->GetIsolate(), context->Global());
   global.SetHidden("contextId", context_id);
 
+#if BUILDFLAG(ENABLE_REMOTE_MODULE)
   auto* command_line = base::CommandLine::ForCurrentProcess();
   bool enableRemoteModule =
       command_line->HasSwitch(switches::kEnableRemoteModule);
   global.SetHidden("enableRemoteModule", enableRemoteModule);
+#endif
 }
 
 void RendererClientBase::AddRenderBindings(
@@ -271,16 +269,6 @@ void RendererClientBase::DidClearWindowObject(
     content::RenderFrame* render_frame) {
   // Make sure every page will get a script context created.
   render_frame->GetWebFrame()->ExecuteScript(blink::WebScriptSource("void 0"));
-}
-
-std::unique_ptr<blink::WebSpeechSynthesizer>
-RendererClientBase::OverrideSpeechSynthesizer(
-    blink::WebSpeechSynthesizerClient* client) {
-#if BUILDFLAG(ENABLE_TTS)
-  return std::make_unique<TtsDispatcher>(client);
-#else
-  return nullptr;
-#endif
 }
 
 bool RendererClientBase::OverrideCreatePlugin(
