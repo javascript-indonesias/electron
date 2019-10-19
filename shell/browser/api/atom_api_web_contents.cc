@@ -72,6 +72,7 @@
 #include "shell/browser/web_view_guest_delegate.h"
 #include "shell/common/api/atom_api_native_image.h"
 #include "shell/common/color_util.h"
+#include "shell/common/gin_helper/dictionary.h"
 #include "shell/common/mouse_util.h"
 #include "shell/common/native_mate_converters/blink_converter.h"
 #include "shell/common/native_mate_converters/content_converter.h"
@@ -79,7 +80,6 @@
 #include "shell/common/native_mate_converters/gfx_converter.h"
 #include "shell/common/native_mate_converters/gurl_converter.h"
 #include "shell/common/native_mate_converters/image_converter.h"
-#include "shell/common/native_mate_converters/map_converter.h"
 #include "shell/common/native_mate_converters/net_converter.h"
 #include "shell/common/native_mate_converters/network_converter.h"
 #include "shell/common/native_mate_converters/once_callback.h"
@@ -88,6 +88,7 @@
 #include "shell/common/node_includes.h"
 #include "shell/common/options_switches.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
+#include "third_party/blink/public/common/page/page_zoom.h"
 #include "third_party/blink/public/mojom/frame/find_in_page.mojom.h"
 #include "third_party/blink/public/platform/web_cursor_info.h"
 #include "third_party/blink/public/platform/web_input_event.h"
@@ -130,7 +131,7 @@ template <>
 struct Converter<printing::PrinterBasicInfo> {
   static v8::Local<v8::Value> ToV8(v8::Isolate* isolate,
                                    const printing::PrinterBasicInfo& val) {
-    mate::Dictionary dict(isolate, v8::Object::New(isolate));
+    gin_helper::Dictionary dict = gin::Dictionary::CreateEmpty(isolate);
     dict.Set("name", val.printer_name);
     dict.Set("description", val.printer_description);
     dict.Set("status", val.printer_status);
@@ -938,7 +939,7 @@ void WebContents::DidAcquireFullscreen(content::RenderFrameHost* rfh) {
   set_fullscreen_frame(rfh);
 }
 
-void WebContents::DocumentLoadedInFrame(
+void WebContents::DOMContentLoaded(
     content::RenderFrameHost* render_frame_host) {
   if (!render_frame_host->GetParent())
     Emit("dom-ready");
@@ -2316,13 +2317,22 @@ double WebContents::GetZoomLevel() const {
 }
 
 void WebContents::SetZoomFactor(double factor) {
-  auto level = content::ZoomFactorToZoomLevel(factor);
+  auto level = blink::PageZoomFactorToZoomLevel(factor);
   SetZoomLevel(level);
 }
 
 double WebContents::GetZoomFactor() const {
   auto level = GetZoomLevel();
-  return content::ZoomLevelToZoomFactor(level);
+  return blink::PageZoomLevelToZoomFactor(level);
+}
+
+void WebContents::SetZoomLimits(double min_zoom, double max_zoom) {
+  // Round the double to avoid returning incorrect minimum/maximum zoom
+  // percentages.
+  int minimum_percent = round(blink::PageZoomLevelToZoomFactor(min_zoom) * 100);
+  int maximum_percent = round(blink::PageZoomLevelToZoomFactor(max_zoom) * 100);
+  web_contents()->SetMinimumZoomPercent(minimum_percent);
+  web_contents()->SetMaximumZoomPercent(maximum_percent);
 }
 
 void WebContents::SetTemporaryZoomLevel(double level) {
