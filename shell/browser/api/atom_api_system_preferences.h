@@ -8,12 +8,9 @@
 #include <memory>
 #include <string>
 
-#include "base/callback.h"
-#include "base/values.h"
-#include "native_mate/handle.h"
-#include "shell/browser/api/event_emitter_deprecated.h"
+#include "gin/handle.h"
 #include "shell/common/gin_helper/error_thrower.h"
-#include "shell/common/node_includes.h"
+#include "shell/common/gin_helper/event_emitter.h"
 #include "shell/common/promise_util.h"
 
 #if defined(OS_WIN)
@@ -38,7 +35,7 @@ enum NotificationCenterKind {
 };
 #endif
 
-class SystemPreferences : public mate::EventEmitter<SystemPreferences>
+class SystemPreferences : public gin_helper::EventEmitter<SystemPreferences>
 #if defined(OS_WIN)
     ,
                           public BrowserObserver,
@@ -46,7 +43,7 @@ class SystemPreferences : public mate::EventEmitter<SystemPreferences>
 #endif
 {
  public:
-  static mate::Handle<SystemPreferences> Create(v8::Isolate* isolate);
+  static gin::Handle<SystemPreferences> Create(v8::Isolate* isolate);
 
   static void BuildPrototype(v8::Isolate* isolate,
                              v8::Local<v8::FunctionTemplate> prototype);
@@ -75,7 +72,7 @@ class SystemPreferences : public mate::EventEmitter<SystemPreferences>
 
   void PostNotification(const std::string& name,
                         const base::DictionaryValue& user_info,
-                        mate::Arguments* args);
+                        gin_helper::Arguments* args);
   int SubscribeNotification(const std::string& name,
                             const NotificationCallback& callback);
   void UnsubscribeNotification(int id);
@@ -91,10 +88,10 @@ class SystemPreferences : public mate::EventEmitter<SystemPreferences>
   void UnsubscribeWorkspaceNotification(int request_id);
   v8::Local<v8::Value> GetUserDefault(const std::string& name,
                                       const std::string& type);
-  void RegisterDefaults(mate::Arguments* args);
+  void RegisterDefaults(gin_helper::Arguments* args);
   void SetUserDefault(const std::string& name,
                       const std::string& type,
-                      mate::Arguments* args);
+                      gin_helper::Arguments* args);
   void RemoveUserDefault(const std::string& name);
   bool IsSwipeTrackingFromScrollEventsEnabled();
 
@@ -110,7 +107,7 @@ class SystemPreferences : public mate::EventEmitter<SystemPreferences>
   // TODO(codebytere): Write tests for these methods once we
   // are running tests on a Mojave machine
   std::string GetMediaAccessStatus(const std::string& media_type,
-                                   mate::Arguments* args);
+                                   gin_helper::Arguments* args);
   v8::Local<v8::Promise> AskForMediaAccess(v8::Isolate* isolate,
                                            const std::string& media_type);
 
@@ -118,7 +115,7 @@ class SystemPreferences : public mate::EventEmitter<SystemPreferences>
   // are running tests on a Mojave machine
   v8::Local<v8::Value> GetEffectiveAppearance(v8::Isolate* isolate);
   v8::Local<v8::Value> GetAppLevelAppearance(v8::Isolate* isolate);
-  void SetAppLevelAppearance(mate::Arguments* args);
+  void SetAppLevelAppearance(gin_helper::Arguments* args);
 #endif
   bool IsDarkMode();
   bool IsInvertedColorScheme();

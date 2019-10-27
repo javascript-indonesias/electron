@@ -9,28 +9,39 @@
 #include <vector>
 
 #include "base/optional.h"
+#include "content/public/browser/browser_thread.h"
 #include "electron/shell/common/api/api.mojom.h"
+#include "native_mate/wrappable.h"
 #include "shell/common/gin_helper/event_emitter_caller.h"
+
+namespace content {
+class RenderFrameHost;
+}
 
 namespace gin_helper {
 
 namespace internal {
 
-v8::Local<v8::Object> CreateEventObject(v8::Isolate* isolate);
-v8::Local<v8::Object> CreateCustomEvent(v8::Isolate* isolate,
-                                        v8::Local<v8::Object> object,
-                                        v8::Local<v8::Object> event);
+v8::Local<v8::Object> CreateEvent(
+    v8::Isolate* isolate,
+    v8::Local<v8::Object> sender = v8::Local<v8::Object>(),
+    v8::Local<v8::Object> custom_event = v8::Local<v8::Object>());
 v8::Local<v8::Object> CreateEventFromFlags(v8::Isolate* isolate, int flags);
+v8::Local<v8::Object> CreateNativeEvent(
+    v8::Isolate* isolate,
+    v8::Local<v8::Object> sender,
+    content::RenderFrameHost* frame,
+    base::Optional<electron::mojom::ElectronBrowser::MessageSyncCallback>
+        callback);
 
 }  // namespace internal
 
 // Provide helperers to emit event in JavaScript.
-//
-// TODO(zcbenz): Inherit from Wrappable directly after removing native_mate.
-template <typename Base>
-class EventEmitter : public Base {
+template <typename T>
+class EventEmitter : public mate::Wrappable<T> {
  public:
-  typedef std::vector<v8::Local<v8::Value>> ValueArray;
+  using Base = mate::Wrappable<T>;
+  using ValueArray = std::vector<v8::Local<v8::Value>>;
 
   // Make the convinient methods visible:
   // https://isocpp.org/wiki/faq/templates#nondependent-name-lookup-members
@@ -45,9 +56,9 @@ class EventEmitter : public Base {
   bool EmitCustomEvent(base::StringPiece name,
                        v8::Local<v8::Object> event,
                        Args&&... args) {
-    return EmitWithEvent(
-        name, internal::CreateCustomEvent(isolate(), GetWrapper(), event),
-        std::forward<Args>(args)...);
+    return EmitWithEvent(name,
+                         internal::CreateEvent(isolate(), GetWrapper(), event),
+                         std::forward<Args>(args)...);
   }
 
   // this.emit(name, new Event(flags), args...);
@@ -64,14 +75,27 @@ class EventEmitter : public Base {
     v8::Locker locker(isolate());
     v8::HandleScope handle_scope(isolate());
     v8::Local<v8::Object> wrapper = GetWrapper();
-    if (wrapper.IsEmpty()) {
+    if (wrapper.IsEmpty())
       return false;
-    }
-    v8::Local<v8::Object> event = internal::CreateEventObject(isolate());
-    event
-        ->Set(isolate()->GetCurrentContext(),
-              gin::StringToV8(isolate(), "sender"), wrapper)
-        .IsJust();
+    v8::Local<v8::Object> event = internal::CreateEvent(isolate(), wrapper);
+    return EmitWithEvent(name, event, std::forward<Args>(args)...);
+  }
+
+  // this.emit(name, new Event(sender, message), args...);
+  template <typename... Args>
+  bool EmitWithSender(
+      base::StringPiece name,
+      content::RenderFrameHost* sender,
+      base::Optional<electron::mojom::ElectronBrowser::InvokeCallback> callback,
+      Args&&... args) {
+    DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+    v8::Locker locker(isolate());
+    v8::HandleScope handle_scope(isolate());
+    v8::Local<v8::Object> wrapper = GetWrapper();
+    if (wrapper.IsEmpty())
+      return false;
+    v8::Local<v8::Object> event = internal::CreateNativeEvent(
+        isolate(), wrapper, sender, std::move(callback));
     return EmitWithEvent(name, event, std::forward<Args>(args)...);
   }
 
@@ -90,7 +114,8 @@ class EventEmitter : public Base {
     v8::Locker locker(isolate);
     v8::HandleScope handle_scope(isolate);
     auto context = isolate->GetCurrentContext();
-    EmitEvent(isolate, GetWrapper(), name, event, std::forward<Args>(args)...);
+    gin_helper::EmitEvent(isolate, GetWrapper(), name, event,
+                          std::forward<Args>(args)...);
     v8::Local<v8::Value> defaultPrevented;
     if (event->Get(context, gin::StringToV8(isolate, "defaultPrevented"))
             .ToLocal(&defaultPrevented)) {
