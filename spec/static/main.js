@@ -76,14 +76,11 @@ ipcMain.on('echo', function (event, msg) {
 
 global.setTimeoutPromisified = util.promisify(setTimeout)
 
-global.isCi = !!argv.ci
-if (global.isCi) {
-  process.removeAllListeners('uncaughtException')
-  process.on('uncaughtException', function (error) {
-    console.error(error, error.stack)
-    process.exit(1)
-  })
-}
+process.removeAllListeners('uncaughtException')
+process.on('uncaughtException', function (error) {
+  console.error(error, error.stack)
+  process.exit(1)
+})
 
 global.nativeModulesEnabled = !process.env.ELECTRON_SKIP_NATIVE_MODULE_TESTS
 
@@ -122,7 +119,7 @@ app.on('ready', function () {
 
   window = new BrowserWindow({
     title: 'Electron Tests',
-    show: !global.isCi,
+    show: false,
     width: 800,
     height: 600,
     webPreferences: {
@@ -198,25 +195,6 @@ ipcMain.on('disable-preload-on-next-will-attach-webview', (event, id) => {
     delete webPreferences.preload
     delete webPreferences.preloadURL
   })
-})
-
-ipcMain.on('try-emit-web-contents-event', (event, id, eventName) => {
-  const consoleWarn = console.warn
-  const contents = webContents.fromId(id)
-  const listenerCountBefore = contents.listenerCount(eventName)
-
-  console.warn = (warningMessage) => {
-    console.warn = consoleWarn
-
-    const listenerCountAfter = contents.listenerCount(eventName)
-    event.returnValue = {
-      warningMessage,
-      listenerCountBefore,
-      listenerCountAfter
-    }
-  }
-
-  contents.emit(eventName, { sender: contents })
 })
 
 ipcMain.on('handle-uncaught-exception', (event, message) => {
