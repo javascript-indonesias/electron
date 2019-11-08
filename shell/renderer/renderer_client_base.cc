@@ -12,7 +12,7 @@
 #include "base/command_line.h"
 #include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
-#include "components/network_hints/renderer/prescient_networking_dispatcher.h"
+#include "components/network_hints/renderer/web_prescient_networking_impl.h"
 #include "content/common/buildflags.h"
 #include "content/public/common/content_constants.h"
 #include "content/public/common/content_switches.h"
@@ -55,9 +55,9 @@
 #include "shell/common/atom_constants.h"
 #endif  // BUILDFLAG(ENABLE_PDF_VIEWER)
 
-#if BUILDFLAG(ENABLE_PEPPER_FLASH)
-#include "chrome/renderer/pepper/pepper_helper.h"
-#endif  // BUILDFLAG(ENABLE_PEPPER_FLASH)
+#if BUILDFLAG(ENABLE_PLUGINS)
+#include "shell/renderer/pepper_helper.h"
+#endif  // BUILDFLAG(ENABLE_PLUGINS)
 
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "components/printing/renderer/print_render_frame_helper.h"
@@ -208,9 +208,6 @@ void RendererClientBase::RenderThreadStarted() {
   blink::WebSecurityPolicy::RegisterURLSchemeAsAllowingServiceWorkers("file");
   blink::SchemeRegistry::RegisterURLSchemeAsSupportingFetchAPI("file");
 
-  prescient_networking_dispatcher_ =
-      std::make_unique<network_hints::PrescientNetworkingDispatcher>();
-
 #if defined(OS_WIN)
   // Set ApplicationUserModelID in renderer process.
   base::string16 app_id =
@@ -227,7 +224,7 @@ void RendererClientBase::RenderFrameCreated(
   new AutofillAgent(render_frame,
                     render_frame->GetAssociatedInterfaceRegistry());
 #endif
-#if BUILDFLAG(ENABLE_PEPPER_FLASH)
+#if BUILDFLAG(ENABLE_PLUGINS)
   new PepperHelper(render_frame);
 #endif
   new ContentSettingsObserver(render_frame);
@@ -243,12 +240,6 @@ void RendererClientBase::RenderFrameCreated(
   render_frame->GetAssociatedInterfaceRegistry()->AddInterface(
       base::BindRepeating(&ElectronApiServiceImpl::BindTo,
                           service->GetWeakPtr()));
-
-#if BUILDFLAG(ENABLE_PDF_VIEWER)
-  // Allow access to file scheme from pdf viewer.
-  blink::WebSecurityPolicy::AddOriginAccessWhitelistEntry(
-      GURL(kPdfViewerUIOrigin), "file", "", true);
-#endif  // BUILDFLAG(ENABLE_PDF_VIEWER)
 
   content::RenderView* render_view = render_frame->GetRenderView();
   if (render_frame->IsMainFrame() && render_view) {
@@ -348,7 +339,11 @@ void RendererClientBase::DidSetUserAgent(const std::string& user_agent) {
 }
 
 blink::WebPrescientNetworking* RendererClientBase::GetPrescientNetworking() {
-  return prescient_networking_dispatcher_.get();
+  if (!web_prescient_networking_impl_) {
+    web_prescient_networking_impl_ =
+        std::make_unique<network_hints::WebPrescientNetworkingImpl>();
+  }
+  return web_prescient_networking_impl_.get();
 }
 
 void RendererClientBase::RunScriptsAtDocumentStart(

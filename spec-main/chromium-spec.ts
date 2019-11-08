@@ -1,5 +1,4 @@
-import * as chai from 'chai'
-import * as chaiAsPromised from 'chai-as-promised'
+import { expect } from 'chai'
 import { BrowserWindow, WebContents, session, ipcMain, app, protocol, webContents } from 'electron'
 import { emittedOnce } from './events-helpers'
 import { closeAllWindows } from './window-helpers'
@@ -14,11 +13,8 @@ import { promisify } from 'util'
 import { ifit, ifdescribe } from './spec-helpers'
 import { AddressInfo } from 'net'
 
-const { expect } = chai
-
 const features = process.electronBinding('features')
 
-chai.use(chaiAsPromised)
 const fixturesPath = path.resolve(__dirname, '..', 'spec', 'fixtures')
 
 describe('reporting api', () => {
@@ -1064,5 +1060,83 @@ describe('font fallback', () => {
     expect(fonts).to.be.an('array')
     expect(fonts).to.have.length(1)
     if (process.platform === 'win32') { expect(fonts[0].familyName).to.be.oneOf(['Meiryo', 'Yu Gothic']) } else if (process.platform === 'darwin') { expect(fonts[0].familyName).to.equal('Hiragino Kaku Gothic ProN') }
+  })
+})
+
+describe('iframe using HTML fullscreen API while window is OS-fullscreened', () => {
+  const fullscreenChildHtml = promisify(fs.readFile)(
+    path.join(fixturesPath, 'pages', 'fullscreen-oopif.html')
+  )
+  let w: BrowserWindow, server: http.Server
+
+  before(() => {
+    server = http.createServer(async (_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.write(await fullscreenChildHtml)
+      res.end()
+    })
+
+    server.listen(8989, '127.0.0.1')
+  })
+
+  beforeEach(() => {
+    w = new BrowserWindow({
+      show: true,
+      fullscreen: true,
+      webPreferences: {
+        nodeIntegration: true,
+        nodeIntegrationInSubFrames: true
+      }
+    })
+  })
+
+  afterEach(async () => {
+    await closeAllWindows()
+    ;(w as any) = null
+    server.close()
+  })
+
+  it('can fullscreen from out-of-process iframes (OOPIFs)', done => {
+    ipcMain.once('fullscreenChange', async () => {
+      const fullscreenWidth = await w.webContents.executeJavaScript(
+        "document.querySelector('iframe').offsetWidth"
+      )
+      expect(fullscreenWidth > 0).to.be.true()
+
+      await w.webContents.executeJavaScript(
+        "document.querySelector('iframe').contentWindow.postMessage('exitFullscreen', '*')"
+      )
+
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const width = await w.webContents.executeJavaScript(
+        "document.querySelector('iframe').offsetWidth"
+      )
+      expect(width).to.equal(0)
+
+      done()
+    })
+
+    const html =
+      '<iframe style="width: 0" frameborder=0 src="http://localhost:8989" allowfullscreen></iframe>'
+    w.loadURL(`data:text/html,${html}`)
+  })
+
+  it('can fullscreen from in-process iframes', done => {
+    ipcMain.once('fullscreenChange', async () => {
+      const fullscreenWidth = await w.webContents.executeJavaScript(
+        "document.querySelector('iframe').offsetWidth"
+      )
+      expect(fullscreenWidth > 0).to.true()
+
+      await w.webContents.executeJavaScript('document.exitFullscreen()')
+      const width = await w.webContents.executeJavaScript(
+        "document.querySelector('iframe').offsetWidth"
+      )
+      expect(width).to.equal(0)
+      done()
+    })
+
+    w.loadFile(path.join(fixturesPath, 'pages', 'fullscreen-ipif.html'))
   })
 })

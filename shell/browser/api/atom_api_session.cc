@@ -77,6 +77,23 @@
 using content::BrowserThread;
 using content::StoragePartition;
 
+namespace predictors {
+// NOTE(nornagon): this is copied from
+// //chrome/browser/predictors/resource_prefetch_predictor.cc we don't need
+// anything in that file other than this constructor. Without it we get a link
+// error. Probably upstream the constructor should be moved to
+// preconnect_manager.cc.
+PreconnectRequest::PreconnectRequest(
+    const GURL& origin,
+    int num_sockets,
+    const net::NetworkIsolationKey& network_isolation_key)
+    : origin(origin),
+      num_sockets(num_sockets),
+      network_isolation_key(network_isolation_key) {
+  DCHECK_GE(num_sockets, 0);
+}
+}  // namespace predictors
+
 namespace {
 
 struct ClearStorageDataOptions {
@@ -208,6 +225,8 @@ Session::Session(v8::Isolate* isolate, AtomBrowserContext* browser_context)
       ->AddObserver(this);
 
   new SessionPreferences(browser_context);
+
+  protocol_.Reset(isolate, Protocol::Create(isolate, browser_context).ToV8());
 
   Init(isolate);
   AttachAsUserData(browser_context);
@@ -592,11 +611,6 @@ v8::Local<v8::Value> Session::Cookies(v8::Isolate* isolate) {
 }
 
 v8::Local<v8::Value> Session::Protocol(v8::Isolate* isolate) {
-  if (protocol_.IsEmpty()) {
-    v8::Local<v8::Value> handle;
-    handle = Protocol::Create(isolate, browser_context()).ToV8();
-    protocol_.Reset(isolate, handle);
-  }
   return v8::Local<v8::Value>::New(isolate, protocol_);
 }
 

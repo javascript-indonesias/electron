@@ -1,5 +1,4 @@
-import * as chai from 'chai'
-import * as chaiAsPromised from 'chai-as-promised'
+import { expect } from 'chai'
 import * as cp from 'child_process'
 import * as https from 'https'
 import * as net from 'net'
@@ -12,10 +11,6 @@ import { ifdescribe } from './spec-helpers'
 import split = require('split')
 
 const features = process.electronBinding('features')
-
-const { expect } = chai
-
-chai.use(chaiAsPromised)
 
 const fixturesPath = path.resolve(__dirname, '../spec/fixtures')
 
@@ -850,6 +845,40 @@ describe('app module', () => {
           done()
         })
       })
+    })
+
+    it('sets the default client such that getApplicationNameForProtocol returns Electron', () => {
+      app.setAsDefaultProtocolClient(protocol)
+      expect(app.getApplicationNameForProtocol(`${protocol}://`)).to.equal('Electron')
+    })
+  })
+
+  describe('getApplicationNameForProtocol()', () => {
+    it('returns application names for common protocols', function () {
+      // We can't expect particular app names here, but these protocols should
+      // at least have _something_ registered. Except on our Linux CI
+      // environment apparently.
+      if (process.platform === 'linux') {
+        this.skip()
+      }
+
+      const protocols = [
+        'http://',
+        'https://'
+      ]
+      protocols.forEach((protocol) => {
+        expect(app.getApplicationNameForProtocol(protocol)).to.not.equal('')
+      })
+    })
+
+    it('returns an empty string for a bogus protocol', () => {
+      expect(app.getApplicationNameForProtocol('bogus-protocol://')).to.equal('')
+    })
+  })
+
+  describe('isDefaultProtocolClient()', () => {
+    it('returns false for a bogus protocol', () => {
+      expect(app.isDefaultProtocolClient('bogus-protocol://')).to.equal(false)
     })
   })
 

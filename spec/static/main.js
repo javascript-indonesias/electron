@@ -11,6 +11,7 @@ const v8 = require('v8')
 
 const argv = require('yargs')
   .boolean('ci')
+  .array('files')
   .string('g').alias('g', 'grep')
   .boolean('i').alias('i', 'invert')
   .argv
@@ -42,6 +43,7 @@ ipcMain.on('message', function (event, ...args) {
   event.sender.send('message', ...args)
 })
 
+ipcMain.handle('get-modules', () => Object.keys(electron))
 ipcMain.handle('get-temp-dir', () => app.getPath('temp'))
 ipcMain.handle('ping', () => null)
 
@@ -75,6 +77,7 @@ ipcMain.on('echo', function (event, msg) {
 })
 
 global.setTimeoutPromisified = util.promisify(setTimeout)
+global.returnAPromise = (value) => new Promise((resolve) => setTimeout(() => resolve(value), 100))
 
 process.removeAllListeners('uncaughtException')
 process.on('uncaughtException', function (error) {
@@ -131,7 +134,8 @@ app.on('ready', function () {
   window.loadFile('static/index.html', {
     query: {
       grep: argv.grep,
-      invert: argv.invert ? 'true' : ''
+      invert: argv.invert ? 'true' : '',
+      files: argv.files ? argv.files.join(',') : undefined
     }
   })
   window.on('unresponsive', function () {

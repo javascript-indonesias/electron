@@ -1,18 +1,14 @@
 'use strict'
 
-const chai = require('chai')
-const dirtyChai = require('dirty-chai')
+const { expect } = require('chai')
 const path = require('path')
 const { resolveGetters } = require('./expect-helpers')
 const { ifdescribe } = require('./spec-helpers')
 
 const { remote, ipcRenderer } = require('electron')
 const { ipcMain, BrowserWindow } = remote
-const { expect } = chai
 
 const features = process.electronBinding('features')
-
-chai.use(dirtyChai)
 
 const comparePaths = (path1, path2) => {
   if (process.platform === 'win32') {
@@ -155,10 +151,10 @@ ifdescribe(features.isRemoteModuleEnabled())('remote module', () => {
   })
 
   describe('remote modules', () => {
-    it('includes browser process modules as properties', () => {
-      expect(remote.app.getPath).to.be.a('function')
-      expect(remote.webContents.getFocusedWebContents).to.be.a('function')
-      expect(remote.clipboard.readText).to.be.a('function')
+    it('includes browser process modules as properties', async () => {
+      const mainModules = await ipcRenderer.invoke('get-modules')
+      const remoteModules = mainModules.filter(name => remote[name])
+      expect(remoteModules).to.be.deep.equal(mainModules)
     })
 
     it('returns toString() of original function via toString()', () => {
@@ -515,6 +511,24 @@ ifdescribe(features.isRemoteModuleEnabled())('remote module', () => {
     it('does not crash', () => {
       const RUint8Array = remote.getGlobal('Uint8Array')
       const arr = new RUint8Array()
+    })
+  })
+
+  describe('with an overriden global Promise constrctor', () => {
+    let original
+
+    before(() => {
+      original = Promise
+    })
+
+    it('using a promise based method  resolves correctly', async () => {
+      expect(await remote.getGlobal('returnAPromise')(123)).to.equal(123)
+      global.Promise = { resolve: () => ({}) }
+      expect(await remote.getGlobal('returnAPromise')(456)).to.equal(456)
+    })
+
+    after(() => {
+      global.Promise = original
     })
   })
 })

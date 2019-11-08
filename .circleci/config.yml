@@ -73,10 +73,6 @@ machine-mac-large: &machine-mac-large
     xcode: "10.3.0"
 
 # Build configurations options.
-env-debug-build: &env-debug-build
-  GN_CONFIG: //electron/build/args/debug.gn
-  SKIP_DIST_ZIP: '1'
-
 env-testing-build: &env-testing-build
   GN_CONFIG: //electron/build/args/testing.gn
   CHECK_DIST_MANIFEST: '1'
@@ -246,6 +242,12 @@ step-get-more-space-on-mac: &step-get-more-space-on-mac
     command: |
       if [ "`uname`" == "Darwin" ]; then
         sudo rm -rf /Library/Developer/CoreSimulator
+        sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform
+        sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform
+        sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform
+        sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/WatchSimulator.platform
+        sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/AppleTVSimulator.platform
+        sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform
       fi
 
 step-delete-git-directories: &step-delete-git-directories
@@ -633,6 +635,11 @@ step-ninja-summary: &step-ninja-summary
     command: |
       python depot_tools/post_build_ninja_summary.py -C src/out/Default
 
+step-ninja-report: &step-ninja-report
+  store_artifacts:
+    path: src/out/Default/.ninja_log
+    destination: ninja_log
+
 # Checkout Steps
 step-generate-deps-hash: &step-generate-deps-hash
   run:
@@ -983,10 +990,11 @@ steps-electron-build-with-inline-checkout-for-tests: &steps-electron-build-with-
 
     # Electron app
     - *step-electron-build
+    - *step-ninja-summary
+    - *step-ninja-report
     - *step-maybe-electron-dist-strip
     - *step-electron-dist-build
     - *step-electron-dist-store
-    - *step-ninja-summary
 
     # Native test targets
     - *step-native-unittests-build
@@ -1205,7 +1213,8 @@ steps-tests: &steps-tests
         command: |
           cd src
           export ELECTRON_OUT_DIR=Default
-          (cd electron && node script/yarn test -- --enable-logging)
+          (cd electron && node script/yarn test --runners=main --enable-logging --files $(circleci tests glob spec-main/*-spec.ts | circleci tests split))
+          (cd electron && node script/yarn test --runners=remote --enable-logging --files $(circleci tests glob spec/*-spec.js | circleci tests split))
     - run:
         name: Check test results existence
         command: |
@@ -1322,23 +1331,6 @@ jobs:
     <<: *steps-checkout-and-save-cache
 
   # Layer 2: Builds.
-  linux-x64-debug:
-    <<: *machine-linux-2xlarge
-    environment:
-      <<: *env-linux-2xlarge
-      <<: *env-debug-build
-      <<: *env-enable-sccache
-      <<: *env-ninja-status
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_arm64=True'
-    <<: *steps-electron-build-with-inline-checkout-for-tests
-
-  linux-x64-debug-gn-check:
-    <<: *machine-linux-medium
-    environment:
-      <<: *env-linux-medium
-      <<: *env-debug-build
-    <<: *steps-electron-gn-check
-
   linux-x64-testing:
     <<: *machine-linux-2xlarge
     environment:
@@ -1396,17 +1388,6 @@ jobs:
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
     <<: *steps-electron-build-for-publish
 
-  linux-ia32-debug:
-    <<: *machine-linux-2xlarge
-    environment:
-      <<: *env-linux-2xlarge
-      <<: *env-ia32
-      <<: *env-debug-build
-      <<: *env-enable-sccache
-      <<: *env-ninja-status
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_arm64=True'
-    <<: *steps-electron-build-with-inline-checkout-for-tests
-
   linux-ia32-testing:
     <<: *machine-linux-2xlarge
     environment:
@@ -1449,17 +1430,6 @@ jobs:
       <<: *env-enable-sccache
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
     <<: *steps-electron-build-for-publish
-
-  linux-arm-debug:
-    <<: *machine-linux-2xlarge
-    environment:
-      <<: *env-linux-2xlarge
-      <<: *env-arm
-      <<: *env-debug-build
-      <<: *env-enable-sccache
-      <<: *env-ninja-status
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_arm64=True'
-    <<: *steps-electron-build-with-inline-checkout-for-tests
 
   linux-arm-testing:
     <<: *machine-linux-2xlarge
@@ -1504,25 +1474,6 @@ jobs:
       GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_boto=True --custom-var=checkout_requests=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
     <<: *steps-electron-build-for-publish
-
-  linux-arm64-debug:
-    <<: *machine-linux-2xlarge
-    environment:
-      <<: *env-linux-2xlarge
-      <<: *env-arm64
-      <<: *env-debug-build
-      <<: *env-enable-sccache
-      <<: *env-ninja-status
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_arm64=True'
-    <<: *steps-electron-build-with-inline-checkout-for-tests
-
-  linux-arm64-debug-gn-check:
-    <<: *machine-linux-medium
-    environment:
-      <<: *env-linux-medium
-      <<: *env-arm64
-      <<: *env-debug-build
-    <<: *steps-electron-gn-check
 
   linux-arm64-testing:
     <<: *machine-linux-2xlarge
@@ -1585,22 +1536,6 @@ jobs:
       <<: *env-ninja-status
     <<: *steps-electron-build
 
-  osx-debug:
-    <<: *machine-mac-large
-    environment:
-      <<: *env-mac-large
-      <<: *env-debug-build
-      <<: *env-enable-sccache
-      <<: *env-ninja-status
-    <<: *steps-electron-build
-
-  osx-debug-gn-check:
-    <<: *machine-mac
-    environment:
-      <<: *env-machine-mac
-      <<: *env-debug-build
-    <<: *steps-electron-gn-check
-
   osx-testing-gn-check:
     <<: *machine-mac
     environment:
@@ -1645,24 +1580,6 @@ jobs:
       <<: *env-enable-sccache
       <<: *env-ninja-status
     <<: *steps-electron-build
-
-  mas-debug:
-    <<: *machine-mac-large
-    environment:
-      <<: *env-mac-large
-      <<: *env-mas
-      <<: *env-debug-build
-      <<: *env-enable-sccache
-      <<: *env-ninja-status
-    <<: *steps-electron-build
-
-  mas-debug-gn-check:
-    <<: *machine-mac
-    environment:
-      <<: *env-machine-mac
-      <<: *env-mas
-      <<: *env-debug-build
-    <<: *steps-electron-gn-check
 
   mas-testing-gn-check:
     <<: *machine-mac
@@ -1748,6 +1665,7 @@ jobs:
       <<: *env-linux-medium
       <<: *env-headless-testing
       <<: *env-stack-dumping
+    parallelism: 3
     <<: *steps-tests
 
   linux-x64-testing-nan:
@@ -1797,6 +1715,7 @@ jobs:
       <<: *env-ia32
       <<: *env-headless-testing
       <<: *env-stack-dumping
+    parallelism: 3
     <<: *steps-tests
 
   linux-ia32-testing-nan:
@@ -1849,6 +1768,7 @@ jobs:
     environment:
       <<: *env-mac-large
       <<: *env-stack-dumping
+    parallelism: 2
     <<: *steps-tests
 
   osx-release-tests:
@@ -1878,6 +1798,7 @@ jobs:
     environment:
       <<: *env-mac-large
       <<: *env-stack-dumping
+    parallelism: 2
     <<: *steps-tests
 
   mas-release-tests:
@@ -2007,10 +1928,6 @@ workflows:
       - linux-checkout-fast
       - linux-checkout-and-save-cache
 
-      - linux-x64-debug
-      - linux-x64-debug-gn-check:
-          requires:
-            - linux-checkout-fast
       - linux-x64-testing
       - linux-x64-testing-no-run-as-node
       - linux-x64-testing-gn-check:
@@ -2026,7 +1943,6 @@ workflows:
           requires:
             - linux-x64-testing
 
-      - linux-ia32-debug
       - linux-ia32-testing
       - linux-ia32-testing-tests:
           requires:
@@ -2038,13 +1954,8 @@ workflows:
           requires:
             - linux-ia32-testing
 
-      - linux-arm-debug
       - linux-arm-testing
 
-      - linux-arm64-debug
-      - linux-arm64-debug-gn-check:
-          requires:
-            - linux-checkout-fast
       - linux-arm64-testing
       - linux-arm64-testing-gn-check:
           requires:
@@ -2061,14 +1972,6 @@ workflows:
           requires:
             - mac-checkout-fast
 
-      - osx-debug:
-          requires:
-            - mac-checkout-fast
-
-      - osx-debug-gn-check:
-          requires:
-            - mac-checkout-fast
-
       - osx-testing-gn-check:
           requires:
             - mac-checkout-fast
@@ -2078,14 +1981,6 @@ workflows:
             - osx-testing
 
       - mas-testing:
-          requires:
-            - mac-checkout-fast
-
-      - mas-debug:
-          requires:
-            - mac-checkout-fast
-
-      - mas-debug-gn-check:
           requires:
             - mac-checkout-fast
 
