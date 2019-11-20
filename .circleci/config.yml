@@ -151,6 +151,10 @@ env-ninja-status: &env-ninja-status
 env-disable-run-as-node: &env-disable-run-as-node
   GN_BUILDFLAG_ARGS: 'enable_run_as_node = false'
 
+env-32bit-release: &env-32bit-release
+  # Set symbol level to 1 for 32 bit releases because of https://crbug.com/648948
+  GN_BUILDFLAG_ARGS: 'symbol_level = 1'
+
 # Individual (shared) steps.
 step-maybe-notify-slack-failure: &step-maybe-notify-slack-failure
   run:
@@ -252,10 +256,11 @@ step-get-more-space-on-mac: &step-get-more-space-on-mac
 
 step-delete-git-directories: &step-delete-git-directories
   run:
-    name: Delete src/.git directory on MacOS to free space
+    name: Delete all .git directories under src on MacOS to free space
     command: |
       if [ "`uname`" == "Darwin" ]; then
-        sudo rm -rf src/.git
+        cd src
+        ( find . -type d -name ".git" ) | xargs rm -rf
       fi
 
 # On macOS the yarn install command during gclient sync was run on a linux
@@ -903,8 +908,8 @@ steps-electron-build: &steps-electron-build
     - *step-get-more-space-on-mac
     - *step-install-npm-deps-on-mac
     - *step-fix-sync-on-mac
-    - *step-gn-gen-default
     - *step-delete-git-directories
+    - *step-gn-gen-default
 
     # Electron app
     - *step-electron-build
@@ -985,8 +990,8 @@ steps-electron-build-with-inline-checkout-for-tests: &steps-electron-build-with-
     - *step-get-more-space-on-mac
     - *step-install-npm-deps-on-mac
     - *step-fix-sync-on-mac
-    - *step-gn-gen-default
     - *step-delete-git-directories
+    - *step-gn-gen-default
 
     # Electron app
     - *step-electron-build
@@ -1081,8 +1086,9 @@ steps-electron-build-for-publish: &steps-electron-build-for-publish
     - *step-get-more-space-on-mac
     - *step-gclient-sync
     - *step-setup-env-for-build
-    - *step-gn-gen-default
     - *step-delete-git-directories
+    - *step-minimize-workspace-size-from-checkout
+    - *step-gn-gen-default
 
     # Electron app
     - *step-electron-build
@@ -1428,6 +1434,7 @@ jobs:
       <<: *env-ia32
       <<: *env-release-build
       <<: *env-enable-sccache
+      <<: *env-32bit-release
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
     <<: *steps-electron-build-for-publish
 
@@ -1471,6 +1478,7 @@ jobs:
       <<: *env-arm
       <<: *env-release-build
       <<: *env-enable-sccache
+      <<: *env-32bit-release
       GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_boto=True --custom-var=checkout_requests=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
     <<: *steps-electron-build-for-publish
