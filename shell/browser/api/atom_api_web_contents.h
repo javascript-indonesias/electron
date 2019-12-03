@@ -272,7 +272,6 @@ class WebContents : public gin_helper::TrackableObject<WebContents>,
   double GetZoomLevel() const;
   void SetZoomFactor(double factor);
   double GetZoomFactor() const;
-  void SetZoomLimits(double min_zoom, double max_zoom) override;
 
   // Callback triggered on permission response.
   void OnEnterFullscreenModeForTab(
@@ -422,7 +421,8 @@ class WebContents : public gin_helper::TrackableObject<WebContents>,
   // content::WebContentsObserver:
   void BeforeUnloadFired(bool proceed,
                          const base::TimeTicks& proceed_time) override;
-  void RenderViewCreated(content::RenderViewHost*) override;
+  void RenderViewCreated(content::RenderViewHost* render_view_host) override;
+  void RenderFrameCreated(content::RenderFrameHost* render_frame_host) override;
   void RenderViewHostChanged(content::RenderViewHost* old_host,
                              content::RenderViewHost* new_host) override;
   void RenderViewDeleted(content::RenderViewHost*) override;
