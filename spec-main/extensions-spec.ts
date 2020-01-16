@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { session, BrowserWindow, ipcMain } from 'electron'
+import { session, BrowserWindow, ipcMain, WebContents } from 'electron'
 import { closeAllWindows, closeWindow } from './window-helpers'
 import * as http from 'http'
 import { AddressInfo } from 'net'
@@ -121,6 +121,39 @@ ifdescribe(process.electronBinding('features').isExtensionsEnabled())('chrome ex
     })
   })
 
+  describe('chrome.tabs', () => {
+    it('executeScript', async () => {
+      const customSession = session.fromPartition(`persist:${require('uuid').v4()}`)
+      ;(customSession as any).loadExtension(path.join(fixtures, 'extensions', 'chrome-api'))
+      const w = new BrowserWindow({ show: false, webPreferences: { session: customSession, nodeIntegration: true } })
+      await w.loadURL(url)
+
+      const message = { method: 'executeScript', args: ['1 + 2'] }
+      w.webContents.executeJavaScript(`window.postMessage('${JSON.stringify(message)}', '*')`)
+
+      const [,, responseString] = await emittedOnce(w.webContents, 'console-message')
+      const response = JSON.parse(responseString)
+
+      expect(response).to.equal(3)
+    })
+
+    it('sendMessage receives the response', async function () {
+      const customSession = session.fromPartition(`persist:${require('uuid').v4()}`)
+      ;(customSession as any).loadExtension(path.join(fixtures, 'extensions', 'chrome-api'))
+      const w = new BrowserWindow({ show: false, webPreferences: { session: customSession, nodeIntegration: true } })
+      await w.loadURL(url)
+
+      const message = { method: 'sendMessage', args: ['Hello World!'] }
+      w.webContents.executeJavaScript(`window.postMessage('${JSON.stringify(message)}', '*')`)
+
+      const [,, responseString] = await emittedOnce(w.webContents, 'console-message')
+      const response = JSON.parse(responseString)
+
+      expect(response.message).to.equal('Hello World!')
+      expect(response.tabId).to.equal(w.webContents.id)
+    })
+  })
+
   describe('background pages', () => {
     it('loads a lazy background page when sending a message', async () => {
       const customSession = session.fromPartition(`persist:${require('uuid').v4()}`)
@@ -136,6 +169,45 @@ ifdescribe(process.electronBinding('features').isExtensionsEnabled())('chrome ex
       } finally {
         w.destroy()
       }
+    })
+  })
+
+  describe('devtools extensions', () => {
+    let showPanelTimeoutId: any = null
+    afterEach(() => {
+      if (showPanelTimeoutId) clearTimeout(showPanelTimeoutId)
+    })
+    const showLastDevToolsPanel = (w: BrowserWindow) => {
+      w.webContents.once('devtools-opened', () => {
+        const show = () => {
+          if (w == null || w.isDestroyed()) return
+          const { devToolsWebContents } = w as unknown as { devToolsWebContents: WebContents | undefined }
+          if (devToolsWebContents == null || devToolsWebContents.isDestroyed()) {
+            return
+          }
+
+          const showLastPanel = () => {
+            // this is executed in the devtools context, where UI is a global
+            const { UI } = (window as any)
+            const lastPanelId = UI.inspectorView._tabbedPane._tabs.peekLast().id
+            UI.inspectorView.showPanel(lastPanelId)
+          }
+          devToolsWebContents.executeJavaScript(`(${showLastPanel})()`, false).then(() => {
+            showPanelTimeoutId = setTimeout(show, 100)
+          })
+        }
+        showPanelTimeoutId = setTimeout(show, 100)
+      })
+    }
+
+    it('loads a devtools extension', async () => {
+      const customSession = session.fromPartition(`persist:${require('uuid').v4()}`);
+      (customSession as any).loadExtension(path.join(fixtures, 'extensions', 'devtools-extension'))
+      const w = new BrowserWindow({ show: true, webPreferences: { session: customSession, nodeIntegration: true } })
+      await w.loadURL('data:text/html,hello')
+      w.webContents.openDevTools()
+      showLastDevToolsPanel(w)
+      await emittedOnce(ipcMain, 'winning')
     })
   })
 })
