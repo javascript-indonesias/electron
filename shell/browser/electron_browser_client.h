@@ -173,6 +173,15 @@ class ElectronBrowserClient : public content::ContentBrowserClient,
       int render_process_id,
       int render_frame_id,
       NonNetworkURLLoaderFactoryMap* factories) override;
+  void CreateWebSocket(
+      content::RenderFrameHost* frame,
+      WebSocketFactory factory,
+      const GURL& url,
+      const net::SiteForCookies& site_for_cookies,
+      const base::Optional<std::string>& user_agent,
+      mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
+          handshake_client) override;
+  bool WillInterceptWebSocket(content::RenderFrameHost*) override;
   bool WillCreateURLLoaderFactory(
       content::BrowserContext* browser_context,
       content::RenderFrameHost* frame,
@@ -186,6 +195,9 @@ class ElectronBrowserClient : public content::ContentBrowserClient,
       bool* bypass_redirect_checks,
       bool* disable_secure_dns,
       network::mojom::URLLoaderFactoryOverridePtr* factory_override) override;
+  bool ShouldTreatURLSchemeAsFirstPartyWhenTopLevel(
+      base::StringPiece scheme,
+      bool is_embedded_origin_secure) override;
   void OverrideURLLoaderFactoryParams(
       content::BrowserContext* browser_context,
       const url::Origin& origin,
@@ -221,6 +233,15 @@ class ElectronBrowserClient : public content::ContentBrowserClient,
       bool first_auth_attempt,
       LoginAuthRequiredCallback auth_required_callback) override;
   void SiteInstanceGotProcess(content::SiteInstance* site_instance) override;
+  std::vector<std::unique_ptr<blink::URLLoaderThrottle>>
+  CreateURLLoaderThrottles(
+      const network::ResourceRequest& request,
+      content::BrowserContext* browser_context,
+      const base::RepeatingCallback<content::WebContents*()>& wc_getter,
+      content::NavigationUIData* navigation_ui_data,
+      int frame_tree_node_id) override;
+  base::flat_set<std::string> GetPluginMimeTypesWithExternalHandlers(
+      content::BrowserContext* browser_context) override;
   bool IsSuitableHost(content::RenderProcessHost* process_host,
                       const GURL& site_url) override;
   bool ShouldUseProcessPerSite(content::BrowserContext* browser_context,
@@ -289,6 +310,10 @@ class ElectronBrowserClient : public content::ContentBrowserClient,
   std::string user_agent_override_ = "";
 
   bool disable_process_restart_tricks_ = false;
+
+  // Simple shared ID generator, used by ProxyingURLLoaderFactory and
+  // ProxyingWebSocket classes.
+  uint64_t next_id_ = 0;
 
   DISALLOW_COPY_AND_ASSIGN(ElectronBrowserClient);
 };

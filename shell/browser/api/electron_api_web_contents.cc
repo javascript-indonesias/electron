@@ -705,8 +705,9 @@ void WebContents::BeforeUnloadFired(content::WebContents* tab,
 }
 
 void WebContents::SetContentsBounds(content::WebContents* source,
-                                    const gfx::Rect& pos) {
-  Emit("move", pos);
+                                    const gfx::Rect& rect) {
+  for (ExtendedWebContentsObserver& observer : observers_)
+    observer.OnSetContentBounds(rect);
 }
 
 void WebContents::CloseContents(content::WebContents* source) {
@@ -725,7 +726,8 @@ void WebContents::CloseContents(content::WebContents* source) {
 }
 
 void WebContents::ActivateContents(content::WebContents* source) {
-  Emit("activate");
+  for (ExtendedWebContentsObserver& observer : observers_)
+    observer.OnActivateContents();
 }
 
 void WebContents::UpdateTargetURL(content::WebContents* source,
@@ -1228,6 +1230,8 @@ void WebContents::TitleWasSet(content::NavigationEntry* entry) {
       final_title = title;
     }
   }
+  for (ExtendedWebContentsObserver& observer : observers_)
+    observer.OnPageTitleUpdated(final_title, explicit_set);
   Emit("page-title-updated", final_title, explicit_set);
 }
 
@@ -1803,18 +1807,21 @@ void WebContents::Print(gin_helper::Arguments* args) {
     settings.SetIntKey(printing::kSettingMarginsType, margin_type);
 
     if (margin_type == printing::CUSTOM_MARGINS) {
+      base::Value custom_margins(base::Value::Type::DICTIONARY);
       int top = 0;
       margins.Get("top", &top);
-      settings.SetIntKey(printing::kSettingMarginTop, top);
+      custom_margins.SetIntKey(printing::kSettingMarginTop, top);
       int bottom = 0;
       margins.Get("bottom", &bottom);
-      settings.SetIntKey(printing::kSettingMarginBottom, bottom);
+      custom_margins.SetIntKey(printing::kSettingMarginBottom, bottom);
       int left = 0;
       margins.Get("left", &left);
-      settings.SetIntKey(printing::kSettingMarginLeft, left);
+      custom_margins.SetIntKey(printing::kSettingMarginLeft, left);
       int right = 0;
       margins.Get("right", &right);
-      settings.SetIntKey(printing::kSettingMarginRight, right);
+      custom_margins.SetIntKey(printing::kSettingMarginRight, right);
+      settings.SetPath(printing::kSettingMarginsCustom,
+                       std::move(custom_margins));
     }
   } else {
     settings.SetIntKey(printing::kSettingMarginsType,
@@ -2767,4 +2774,4 @@ void Initialize(v8::Local<v8::Object> exports,
 
 }  // namespace
 
-NODE_LINKED_MODULE_CONTEXT_AWARE(atom_browser_web_contents, Initialize)
+NODE_LINKED_MODULE_CONTEXT_AWARE(electron_browser_web_contents, Initialize)

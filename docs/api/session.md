@@ -487,6 +487,11 @@ to host here.
 
 **Note:** On macOS the OS spellchecker is used and therefore we do not download any dictionary files.  This API is a no-op on macOS.
 
+#### `ses.listWordsInSpellCheckerDictionary()`
+
+Returns `Promise<String[]>` - An array of all words in app's custom dictionary.
+Resolves when the full dictionary is loaded from disk.
+
 #### `ses.addWordToSpellCheckerDictionary(word)`
 
 * `word` String - The word you want to add to the dictionary
@@ -494,6 +499,14 @@ to host here.
 Returns `Boolean` - Whether the word was successfully written to the custom dictionary.
 
 **Note:** On macOS and Windows 10 this word will be written to the OS custom dictionary as well
+
+#### `ses.removeWordFromSpellCheckerDictionary(word)`
+
+* `word` String - The word you want to remove from the dictionary
+
+Returns `Boolean` - Whether the word was successfully removed from the custom dictionary.
+
+**Note:** On macOS and Windows 10 this word will be removed from the OS custom dictionary as well
 
 #### `ses.loadExtension(path)`
 
@@ -507,6 +520,8 @@ requests an API that Electron does not support) then they will be logged to the
 console.
 
 Note that Electron does not support the full range of Chrome extensions APIs.
+See [Supported Extensions APIs](extensions.md#supported-extensions-apis) for
+more details on what is supported.
 
 Note that in previous versions of Electron, extensions that were loaded would
 be remembered for future runs of the application. This is no longer the case:
@@ -528,6 +543,9 @@ This API does not support loading packed (.crx) extensions.
 
 **Note:** This API cannot be called before the `ready` event of the `app` module
 is emitted.
+
+**Note:** Loading extensions into in-memory (non-persistent) sessions is not
+supported and will throw an error.
 
 #### `ses.removeExtension(extensionId)`
 
