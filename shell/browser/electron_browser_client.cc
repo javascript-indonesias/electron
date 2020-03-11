@@ -146,6 +146,7 @@
 #include "extensions/browser/process_map.h"
 #include "extensions/common/api/mime_handler.mojom.h"
 #include "extensions/common/extension.h"
+#include "shell/browser/extensions/electron_extension_message_filter.h"
 #include "shell/browser/extensions/electron_extension_system.h"
 #include "shell/browser/extensions/electron_extension_web_contents_observer.h"
 #endif
@@ -462,6 +463,8 @@ void ElectronBrowserClient::RenderProcessWillLaunch(
       new extensions::ExtensionMessageFilter(process_id, browser_context));
   host->AddFilter(new extensions::ExtensionsGuestViewMessageFilter(
       process_id, browser_context));
+  host->AddFilter(
+      new ElectronExtensionMessageFilter(process_id, browser_context));
 #endif
 
   ProcessPreferences prefs;
@@ -1297,6 +1300,7 @@ bool ElectronBrowserClient::WillInterceptWebSocket(
     return false;
 
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  v8::HandleScope scope(isolate);
   auto* browser_context = frame->GetProcess()->GetBrowserContext();
   auto web_request = api::WebRequest::FromOrCreate(isolate, browser_context);
 
@@ -1317,6 +1321,7 @@ void ElectronBrowserClient::CreateWebSocket(
     mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
         handshake_client) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  v8::HandleScope scope(isolate);
   auto* browser_context = frame->GetProcess()->GetBrowserContext();
   auto web_request = api::WebRequest::FromOrCreate(isolate, browser_context);
   DCHECK(web_request.get());
@@ -1342,6 +1347,7 @@ bool ElectronBrowserClient::WillCreateURLLoaderFactory(
     bool* disable_secure_dns,
     network::mojom::URLLoaderFactoryOverridePtr* factory_override) {
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  v8::HandleScope scope(isolate);
   api::Protocol* protocol =
       api::Protocol::FromWrappedClass(isolate, browser_context);
   DCHECK(protocol);
