@@ -116,6 +116,24 @@ describe('session module', () => {
       expect(c.value).to.equal(value);
     });
 
+    for (const sameSite of <const>['unspecified', 'no_restriction', 'lax', 'strict']) {
+      it(`sets cookies with samesite=${sameSite}`, async () => {
+        const { cookies } = session.defaultSession;
+        const value = 'hithere';
+        await cookies.set({ url, value, sameSite });
+        const c = (await cookies.get({ url }))[0];
+        expect(c.name).to.be.empty();
+        expect(c.value).to.equal(value);
+        expect(c.sameSite).to.equal(sameSite);
+      });
+    }
+
+    it(`fails to set cookies with samesite=garbage`, async () => {
+      const { cookies } = session.defaultSession;
+      const value = 'hithere';
+      await expect(cookies.set({ url, value, sameSite: 'garbage' as any })).to.eventually.be.rejectedWith('Failed to convert \'garbage\' to an appropriate cookie same site value');
+    });
+
     it('gets cookies without url', async () => {
       const { cookies } = session.defaultSession;
       const name = '1';
@@ -293,7 +311,7 @@ describe('session module', () => {
       const { item, itemUrl, itemFilename } = await downloadPrevented;
       expect(itemUrl).to.equal(url);
       expect(itemFilename).to.equal('mockFile.txt');
-      expect(() => item.getURL()).to.throw('Object has been destroyed');
+      expect(() => item.getURL()).to.throw('DownloadItem used after being destroyed');
     });
   });
 
