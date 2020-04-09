@@ -48,7 +48,6 @@ dump_syms.patch
 command-ismediakey.patch
 tts.patch
 printing.patch
-verbose_generate_breakpad_symbols.patch
 support_mixed_sandbox_with_zygote.patch
 autofill_size_calculation.patch
 fix_disable_usage_of_abort_report_np_in_mas_builds.patch
@@ -95,3 +94,4 @@ feat_add_onclose_to_messageport.patch
 gin_allow_passing_an_objecttemplate_to_objecttemplatebuilder.patch
 gin_forward_args_when_dispatching.patch
 fix_undo_redo_broken_in_webviews.patch
+fix_account_for_print_preview_disabled_when_printing_to_pdf.patch
