@@ -12,6 +12,7 @@ import { EventEmitter } from 'events';
 import { promisify } from 'util';
 import { ifit, ifdescribe } from './spec-helpers';
 import { AddressInfo } from 'net';
+import { PipeTransport } from './pipe-transport';
 
 const features = process.electronBinding('features');
 
@@ -247,13 +248,20 @@ describe('web security', () => {
 });
 
 describe('command line switches', () => {
+  let appProcess: ChildProcess.ChildProcessWithoutNullStreams | undefined;
+  afterEach(() => {
+    if (appProcess && !appProcess.killed) {
+      appProcess.kill();
+      appProcess = undefined;
+    }
+  });
   describe('--lang switch', () => {
     const currentLocale = app.getLocale();
     const testLocale = (locale: string, result: string, done: () => void) => {
       const appPath = path.join(fixturesPath, 'api', 'locale-check');
       const electronPath = process.execPath;
       let output = '';
-      const appProcess = ChildProcess.spawn(electronPath, [appPath, `--lang=${locale}`]);
+      appProcess = ChildProcess.spawn(electronPath, [appPath, `--lang=${locale}`]);
 
       appProcess.stdout.on('data', (data) => { output += data; });
       appProcess.stdout.on('end', () => {
@@ -267,21 +275,62 @@ describe('command line switches', () => {
     it('should not set an invalid locale', (done) => testLocale('asdfkl', currentLocale, done));
   });
 
+  describe('--remote-debugging-pipe switch', () => {
+    it('should expose CDP via pipe', async () => {
+      const electronPath = process.execPath;
+      appProcess = ChildProcess.spawn(electronPath, ['--remote-debugging-pipe'], {
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe']
+      });
+      const stdio = appProcess.stdio as unknown as [NodeJS.ReadableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.ReadableStream];
+      const pipe = new PipeTransport(stdio[3], stdio[4]);
+      const versionPromise = new Promise(resolve => { pipe.onmessage = resolve; });
+      pipe.send({ id: 1, method: 'Browser.getVersion', params: {} });
+      const message = (await versionPromise) as any;
+      expect(message.id).to.equal(1);
+      expect(message.result.product).to.contain('Chrome');
+      expect(message.result.userAgent).to.contain('Electron');
+    });
+    it('should override --remote-debugging-port switch', async () => {
+      const electronPath = process.execPath;
+      appProcess = ChildProcess.spawn(electronPath, ['--remote-debugging-pipe', '--remote-debugging-port=0'], {
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe']
+      });
+      let stderr = '';
+      appProcess.stderr.on('data', (data: string) => { stderr += data; });
+      const stdio = appProcess.stdio as unknown as [NodeJS.ReadableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.ReadableStream];
+      const pipe = new PipeTransport(stdio[3], stdio[4]);
+      const versionPromise = new Promise(resolve => { pipe.onmessage = resolve; });
+      pipe.send({ id: 1, method: 'Browser.getVersion', params: {} });
+      const message = (await versionPromise) as any;
+      expect(message.id).to.equal(1);
+      expect(stderr).to.not.include('DevTools listening on');
+    });
+    it('should shut down Electron upon Browser.close CDP command', async () => {
+      const electronPath = process.execPath;
+      appProcess = ChildProcess.spawn(electronPath, ['--remote-debugging-pipe'], {
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe']
+      });
+      const stdio = appProcess.stdio as unknown as [NodeJS.ReadableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.WritableStream, NodeJS.ReadableStream];
+      const pipe = new PipeTransport(stdio[3], stdio[4]);
+      pipe.send({ id: 1, method: 'Browser.close', params: {} });
+      await new Promise(resolve => { appProcess!.on('exit', resolve); });
+    });
+  });
+
   describe('--remote-debugging-port switch', () => {
     it('should display the discovery page', (done) => {
       const electronPath = process.execPath;
       let output = '';
-      const appProcess = ChildProcess.spawn(electronPath, ['--remote-debugging-port=']);
+      appProcess = ChildProcess.spawn(electronPath, ['--remote-debugging-port=']);
 
       appProcess.stderr.on('data', (data) => {
         output += data;
         const m = /DevTools listening on ws:\/\/127.0.0.1:(\d+)\//.exec(output);
         if (m) {
-          appProcess.stderr.removeAllListeners('data');
+          appProcess!.stderr.removeAllListeners('data');
           const port = m[1];
           http.get(`http://127.0.0.1:${port}`, (res) => {
             res.destroy();
-            appProcess.kill();
             expect(res.statusCode).to.eql(200);
             expect(parseInt(res.headers['content-length']!)).to.be.greaterThan(0);
             done();
