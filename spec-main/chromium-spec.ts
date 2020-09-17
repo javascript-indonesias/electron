@@ -222,7 +222,7 @@ describe('web security', () => {
   });
 
   it('engages CORB when web security is not disabled', async () => {
-    const w = new BrowserWindow({ show: true, webPreferences: { webSecurity: true, nodeIntegration: true } });
+    const w = new BrowserWindow({ show: false, webPreferences: { webSecurity: true, nodeIntegration: true } });
     const p = emittedOnce(ipcMain, 'success');
     await w.loadURL(`data:text/html,<script>
         const s = document.createElement('script')
@@ -236,7 +236,7 @@ describe('web security', () => {
   });
 
   it('bypasses CORB when web security is disabled', async () => {
-    const w = new BrowserWindow({ show: true, webPreferences: { webSecurity: false, nodeIntegration: true } });
+    const w = new BrowserWindow({ show: false, webPreferences: { webSecurity: false, nodeIntegration: true } });
     const p = emittedOnce(ipcMain, 'success');
     await w.loadURL(`data:text/html,
       <script>
@@ -246,8 +246,42 @@ describe('web security', () => {
     await p;
   });
 
+  it('engages CORS when web security is not disabled', async () => {
+    const w = new BrowserWindow({ show: false, webPreferences: { webSecurity: true, nodeIntegration: true } });
+    const p = emittedOnce(ipcMain, 'response');
+    await w.loadURL(`data:text/html,<script>
+        (async function() {
+          try {
+            await fetch('${serverUrl}');
+            require('electron').ipcRenderer.send('response', 'passed');
+          } catch {
+            require('electron').ipcRenderer.send('response', 'failed');
+          }
+        })();
+      </script>`);
+    const [, response] = await p;
+    expect(response).to.equal('failed');
+  });
+
+  it('bypasses CORS when web security is disabled', async () => {
+    const w = new BrowserWindow({ show: false, webPreferences: { webSecurity: false, nodeIntegration: true } });
+    const p = emittedOnce(ipcMain, 'response');
+    await w.loadURL(`data:text/html,<script>
+        (async function() {
+          try {
+            await fetch('${serverUrl}');
+            require('electron').ipcRenderer.send('response', 'passed');
+          } catch {
+            require('electron').ipcRenderer.send('response', 'failed');
+          }
+        })();
+      </script>`);
+    const [, response] = await p;
+    expect(response).to.equal('passed');
+  });
+
   it('does not crash when multiple WebContent are created with web security disabled', () => {
-    const options = { webPreferences: { webSecurity: false } };
+    const options = { show: false, webPreferences: { webSecurity: false } };
     const w1 = new BrowserWindow(options);
     w1.loadURL(serverUrl);
     const w2 = new BrowserWindow(options);
