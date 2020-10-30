@@ -302,7 +302,7 @@ describe('command line switches', () => {
     const testLocale = async (locale: string, result: string) => {
       const appPath = path.join(fixturesPath, 'api', 'locale-check');
       const electronPath = process.execPath;
-      appProcess = ChildProcess.spawn(electronPath, [appPath, `--lang=${locale}`]);
+      appProcess = ChildProcess.spawn(electronPath, [appPath, `--set-lang=${locale}`]);
 
       let output = '';
       appProcess.stdout.on('data', (data) => { output += data; });
@@ -790,7 +790,7 @@ describe('chromium features', () => {
         });
         expect(await w.webContents.executeJavaScript(`(${function () {
           const { ipc } = process._linkedBinding('electron_renderer_ipc');
-          return ipc.sendSync(true, 'GUEST_WINDOW_MANAGER_WINDOW_OPEN', ['', '', ''])[0];
+          return ipc.sendSync(true, 'GUEST_WINDOW_MANAGER_WINDOW_OPEN', ['', '', '']);
         }})()`)).to.be.null();
         const exception = await uncaughtException;
         expect(exception.message).to.match(/denied: expected native window\.open/);
@@ -1501,5 +1501,58 @@ describe('navigator.serial', () => {
     });
     const port = await getPorts();
     expect(port).to.equal('[object SerialPort]');
+  });
+});
+
+describe('navigator.clipboard', () => {
+  let w: BrowserWindow;
+  before(async () => {
+    w = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        enableBlinkFeatures: 'Serial'
+      }
+    });
+    await w.loadFile(path.join(fixturesPath, 'pages', 'blank.html'));
+  });
+
+  const readClipboard: any = () => {
+    return w.webContents.executeJavaScript(`
+      navigator.clipboard.read().then(clipboard => clipboard.toString()).catch(err => err.message);
+    `, true);
+  };
+
+  after(closeAllWindows);
+  afterEach(() => {
+    session.defaultSession.setPermissionRequestHandler(null);
+  });
+
+  it('returns clipboard contents when a PermissionRequestHandler is not defined', async () => {
+    const clipboard = await readClipboard();
+    expect(clipboard).to.not.equal('Read permission denied.');
+  });
+
+  it('returns an error when permission denied', async () => {
+    session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => {
+      if (permission === 'clipboard-read') {
+        callback(false);
+      } else {
+        callback(true);
+      }
+    });
+    const clipboard = await readClipboard();
+    expect(clipboard).to.equal('Read permission denied.');
+  });
+
+  it('returns clipboard contents when permission is granted', async () => {
+    session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => {
+      if (permission === 'clipboard-read') {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    });
+    const clipboard = await readClipboard();
+    expect(clipboard).to.not.equal('Read permission denied.');
   });
 });
