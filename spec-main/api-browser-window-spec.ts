@@ -1059,6 +1059,25 @@ describe('BrowserWindow module', () => {
           await unmaximize;
           expectBoundsEqual(w.getNormalBounds(), bounds);
         });
+        it('can check transparent window maximization', async () => {
+          w.destroy();
+          w = new BrowserWindow({
+            show: false,
+            width: 300,
+            height: 300,
+            transparent: true
+          });
+
+          const maximize = emittedOnce(w, 'resize');
+          w.show();
+          w.maximize();
+          await maximize;
+          expect(w.isMaximized()).to.equal(true);
+          const unmaximize = emittedOnce(w, 'resize');
+          w.unmaximize();
+          await unmaximize;
+          expect(w.isMaximized()).to.equal(false);
+        });
       });
 
       ifdescribe(process.platform !== 'linux')('Minimized state', () => {
@@ -2533,6 +2552,7 @@ describe('BrowserWindow module', () => {
         expect(test.systemVersion).to.be.a('string');
         expect(test.cpuUsage).to.be.an('object');
         expect(test.ioCounters).to.be.an('object');
+        expect(test.uptime).to.be.a('number');
         expect(test.arch).to.equal(process.arch);
         expect(test.platform).to.equal(process.platform);
         expect(test.env).to.deep.equal(process.env);
