@@ -890,6 +890,8 @@ step-ninja-summary: &step-ninja-summary
   run:
     name: Print ninja summary
     command: |
+      set +e
+      set +o pipefail
       python depot_tools/post_build_ninja_summary.py -C src/out/Default
 
 step-ninja-report: &step-ninja-report
@@ -1418,9 +1420,6 @@ commands:
       restore-src-cache:
         type: boolean
         default: true
-      preserve-vendor-dirs:
-        type: boolean
-        default: false
     steps:
       - when:
           condition: << parameters.attach >>
@@ -1458,26 +1457,11 @@ commands:
             - store_artifacts:
                 path: patches
             # These next few steps reset Electron to the correct commit regardless of which cache was restored
-            - when:
-                condition: << parameters.preserve-vendor-dirs >>
-                steps:
-                  - run:
-                      name: Preserve vendor dirs for release
-                      command: |
-                        mv src/electron/vendor/requests .
             - run:
                 name: Wipe Electron
                 command: rm -rf src/electron
             - *step-checkout-electron
             - *step-run-electron-only-hooks
-            - when:
-                condition: << parameters.preserve-vendor-dirs >>
-                steps:
-                  - run:
-                      name: Preserve vendor dirs for release
-                      command: |
-                        rm -rf src/electron/vendor/requests
-                        mv requests src/electron/vendor/requests
             - *step-generate-deps-hash-cleanly
             - *step-mark-sync-done
             - *step-minimize-workspace-size-from-checkout
@@ -1673,7 +1657,7 @@ jobs:
     <<: *machine-linux-2xlarge
     environment:
       <<: *env-linux-2xlarge
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_arm64=True --custom-var=checkout_requests=True'
+      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_arm64=True'
     steps:
       - electron-build:
           persist: false
@@ -1681,7 +1665,6 @@ jobs:
           checkout: true
           persist-checkout: true
           restore-src-cache: false
-          preserve-vendor-dirs: true
 
   linux-checkout-fast:
     <<: *machine-linux-2xlarge
@@ -1732,7 +1715,7 @@ jobs:
       <<: *env-linux-2xlarge
       <<: *env-testing-build
       <<: *env-macos-build
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_mac=True --custom-var=host_os=mac --custom-var=checkout_requests=True'
+      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_mac=True --custom-var=host_os=mac'
     steps:
       - electron-build:
           persist: false
@@ -1740,7 +1723,6 @@ jobs:
           checkout: true
           persist-checkout: true
           restore-src-cache: false
-          preserve-vendor-dirs: true
 
   mac-checkout-fast:
     <<: *machine-linux-2xlarge
@@ -1817,7 +1799,6 @@ jobs:
     <<: *machine-linux-2xlarge
     environment:
       <<: *env-linux-2xlarge-release
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_requests=True'
       <<: *env-release-build
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
       <<: *env-ninja-status
@@ -1870,7 +1851,6 @@ jobs:
     <<: *machine-linux-2xlarge
     environment:
       <<: *env-linux-2xlarge-release
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_requests=True'
       <<: *env-ia32
       <<: *env-release-build
       <<: *env-32bit-release
@@ -1931,7 +1911,7 @@ jobs:
       <<: *env-arm
       <<: *env-release-build
       <<: *env-32bit-release
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_requests=True'
+      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
       <<: *env-ninja-status
     steps:
@@ -1996,7 +1976,7 @@ jobs:
       <<: *env-linux-2xlarge-release
       <<: *env-arm64
       <<: *env-release-build
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm64=True --custom-var=checkout_requests=True'
+      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm64=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
       <<: *env-ninja-status
     steps:
@@ -2058,7 +2038,6 @@ jobs:
     environment:
       <<: *env-mac-large-release
       <<: *env-release-build
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_requests=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
       <<: *env-ninja-status
     steps:
@@ -2072,7 +2051,6 @@ jobs:
       <<: *env-mac-large-release
       <<: *env-release-build
       <<: *env-apple-silicon
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_requests=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
       <<: *env-ninja-status
     steps:
@@ -2166,7 +2144,6 @@ jobs:
       <<: *env-mac-large-release
       <<: *env-mas
       <<: *env-release-build
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_requests=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
       <<: *env-ninja-status
     steps:
@@ -2180,7 +2157,6 @@ jobs:
       <<: *env-mac-large-release
       <<: *env-mas-apple-silicon
       <<: *env-release-build
-      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_requests=True'
       UPLOAD_TO_S3: << pipeline.parameters.upload-to-s3 >>
       <<: *env-ninja-status
     steps:

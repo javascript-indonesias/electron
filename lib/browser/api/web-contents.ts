@@ -1,5 +1,5 @@
-import { app, ipcMain, session, deprecate, BrowserWindowConstructorOptions } from 'electron/main';
-import type { MenuItem, MenuItemConstructorOptions, LoadURLOptions } from 'electron/main';
+import { app, ipcMain, session, deprecate, webFrameMain } from 'electron/main';
+import type { BrowserWindowConstructorOptions, MenuItem, MenuItemConstructorOptions, LoadURLOptions } from 'electron/main';
 
 import * as url from 'url';
 import * as path from 'path';
@@ -148,23 +148,23 @@ WebContents.prototype._sendInternal = function (channel, ...args) {
 
   return this._send(true /* internal */, channel, args);
 };
-WebContents.prototype.sendToFrame = function (frameId, channel, ...args) {
+WebContents.prototype.sendToFrame = function (frame, channel, ...args) {
   if (typeof channel !== 'string') {
     throw new Error('Missing required channel argument');
-  } else if (typeof frameId !== 'number') {
-    throw new Error('Missing required frameId argument');
+  } else if (!(typeof frame === 'number' || Array.isArray(frame))) {
+    throw new Error('Missing required frame argument (must be number or array)');
   }
 
-  return this._sendToFrame(false /* internal */, frameId, channel, args);
+  return this._sendToFrame(false /* internal */, frame, channel, args);
 };
-WebContents.prototype._sendToFrameInternal = function (frameId, channel, ...args) {
+WebContents.prototype._sendToFrameInternal = function (frame, channel, ...args) {
   if (typeof channel !== 'string') {
     throw new Error('Missing required channel argument');
-  } else if (typeof frameId !== 'number') {
-    throw new Error('Missing required frameId argument');
+  } else if (!(typeof frame === 'number' || Array.isArray(frame))) {
+    throw new Error('Missing required frame argument (must be number or array)');
   }
 
-  return this._sendToFrame(true /* internal */, frameId, channel, args);
+  return this._sendToFrame(true /* internal */, frame, channel, args);
 };
 
 // Following methods are mapped to webFrame.
@@ -456,9 +456,17 @@ WebContents.prototype._callWindowOpenHandler = function (event: any, url: string
 };
 
 const addReplyToEvent = (event: any) => {
+  const { processId, frameId } = event;
   event.reply = (...args: any[]) => {
-    event.sender.sendToFrame(event.frameId, ...args);
+    event.sender.sendToFrame([processId, frameId], ...args);
   };
+};
+
+const addSenderFrameToEvent = (event: any) => {
+  const { processId, frameId } = event;
+  Object.defineProperty(event, 'senderFrame', {
+    get: () => webFrameMain.fromId(processId, frameId)
+  });
 };
 
 const addReturnValueToEvent = (event: any) => {
@@ -504,6 +512,7 @@ WebContents.prototype._init = function () {
 
   // Dispatch IPC messages to the ipc module.
   this.on('-ipc-message' as any, function (this: Electron.WebContents, event: any, internal: boolean, channel: string, args: any[]) {
+    addSenderFrameToEvent(event);
     if (internal) {
       ipcMainInternal.emit(channel, event, ...args);
     } else {
@@ -514,6 +523,7 @@ WebContents.prototype._init = function () {
   });
 
   this.on('-ipc-invoke' as any, function (event: any, internal: boolean, channel: string, args: any[]) {
+    addSenderFrameToEvent(event);
     event._reply = (result: any) => event.sendReply({ result });
     event._throw = (error: Error) => {
       console.error(`Error occurred in handler for '${channel}':`, error);
@@ -528,6 +538,7 @@ WebContents.prototype._init = function () {
   });
 
   this.on('-ipc-message-sync' as any, function (this: Electron.WebContents, event: any, internal: boolean, channel: string, args: any[]) {
+    addSenderFrameToEvent(event);
     addReturnValueToEvent(event);
     if (internal) {
       ipcMainInternal.emit(channel, event, ...args);
