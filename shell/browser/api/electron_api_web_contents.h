@@ -260,15 +260,6 @@ class WebContents : public gin::Wrappable<WebContents>,
                                 blink::CloneableMessage args,
                                 int32_t sender_id = 0);
 
-  bool SendIPCMessageToFrame(bool internal,
-                             v8::Local<v8::Value> frame,
-                             const std::string& channel,
-                             v8::Local<v8::Value> args);
-
-  void PostMessage(const std::string& channel,
-                   v8::Local<v8::Value> message,
-                   base::Optional<v8::Local<v8::Value>> transfer);
-
   // Send WebInputEvent to the page.
   void SendInputEvent(v8::Isolate* isolate, v8::Local<v8::Value> input_event);
 
@@ -783,6 +774,7 @@ class WebContents : public gin::Wrappable<WebContents>,
   DevToolsIndexingJobsMap devtools_indexing_jobs_;
 
   scoped_refptr<base::SequencedTaskRunner> file_task_runner_;
+  scoped_refptr<base::TaskRunner> print_task_runner_;
 
   // Stores the frame thats currently in fullscreen, nullptr if there is none.
   content::RenderFrameHost* fullscreen_frame_ = nullptr;

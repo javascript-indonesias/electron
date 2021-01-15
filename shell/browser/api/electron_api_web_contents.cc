@@ -422,8 +422,11 @@ bool IsDeviceNameValid(const base::string16& device_name) {
 }
 
 base::string16 GetDefaultPrinterAsync() {
-  base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
-                                                base::BlockingType::MAY_BLOCK);
+#if defined(OS_WIN)
+  // Blocking is needed here because Windows printer drivers are oftentimes
+  // not thread-safe and have to be accessed on the UI thread.
+  base::ThreadRestrictions::ScopedAllowIO allow_io;
+#endif
 
   scoped_refptr<printing::PrintBackend> print_backend =
       printing::PrintBackend::CreateInstance(
@@ -440,6 +443,29 @@ base::string16 GetDefaultPrinterAsync() {
       printer_name = printers.front().printer_name;
   }
   return base::UTF8ToUTF16(printer_name);
+}
+
+// Copied from
+// chrome/browser/ui/webui/print_preview/local_printer_handler_default.cc:L36-L54
+scoped_refptr<base::TaskRunner> CreatePrinterHandlerTaskRunner() {
+  // USER_VISIBLE because the result is displayed in the print preview dialog.
+#if !defined(OS_WIN)
+  static constexpr base::TaskTraits kTraits = {
+      base::MayBlock(), base::TaskPriority::USER_VISIBLE};
+#endif
+
+#if defined(USE_CUPS)
+  // CUPS is thread safe.
+  return base::ThreadPool::CreateTaskRunner(kTraits);
+#elif defined(OS_WIN)
+  // Windows drivers are likely not thread-safe and need to be accessed on the
+  // UI thread.
+  return content::GetUIThreadTaskRunner(
+      {base::MayBlock(), base::TaskPriority::USER_VISIBLE});
+#else
+  // Be conservative on unsupported platforms.
+  return base::ThreadPool::CreateSingleThreadTaskRunner(kTraits);
+#endif
 }
 #endif
 
@@ -591,6 +617,7 @@ WebContents::WebContents(v8::Isolate* isolate,
       devtools_file_system_indexer_(new DevToolsFileSystemIndexer),
       file_task_runner_(
           base::ThreadPool::CreateSequencedTaskRunner({base::MayBlock()})),
+      print_task_runner_(CreatePrinterHandlerTaskRunner()),
       weak_factory_(this) {
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
   // WebContents created by extension host will have valid ViewType set.
@@ -624,6 +651,7 @@ WebContents::WebContents(v8::Isolate* isolate,
       devtools_file_system_indexer_(new DevToolsFileSystemIndexer),
       file_task_runner_(
           base::ThreadPool::CreateSequencedTaskRunner({base::MayBlock()})),
+      print_task_runner_(CreatePrinterHandlerTaskRunner()),
       weak_factory_(this) {
   DCHECK(type != Type::kRemote)
       << "Can't take ownership of a remote WebContents";
@@ -639,6 +667,7 @@ WebContents::WebContents(v8::Isolate* isolate,
       devtools_file_system_indexer_(new DevToolsFileSystemIndexer),
       file_task_runner_(
           base::ThreadPool::CreateSequencedTaskRunner({base::MayBlock()})),
+      print_task_runner_(CreatePrinterHandlerTaskRunner()),
       weak_factory_(this) {
   // Read options.
   options.Get("backgroundThrottling", &background_throttling_);
@@ -1517,39 +1546,6 @@ void WebContents::ReceivePostMessage(
   EmitWithSender("-ipc-ports", render_frame_host,
                  electron::mojom::ElectronBrowser::InvokeCallback(), false,
                  channel, message_value, std::move(wrapped_ports));
-}
-
-void WebContents::PostMessage(const std::string& channel,
-                              v8::Local<v8::Value> message_value,
-                              base::Optional<v8::Local<v8::Value>> transfer) {
-  v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();
-  blink::TransferableMessage transferable_message;
-  if (!electron::SerializeV8Value(isolate, message_value,
-                                  &transferable_message)) {
-    // SerializeV8Value sets an exception.
-    return;
-  }
-
-  std::vector<gin::Handle<MessagePort>> wrapped_ports;
-  if (transfer) {
-    if (!gin::ConvertFromV8(isolate, *transfer, &wrapped_ports)) {
-      isolate->ThrowException(v8::Exception::Error(
-          gin::StringToV8(isolate, "Invalid value for transfer")));
-      return;
-    }
-  }
-
-  bool threw_exception = false;
-  transferable_message.ports =
-      MessagePort::DisentanglePorts(isolate, wrapped_ports, &threw_exception);
-  if (threw_exception)
-    return;
-
-  content::RenderFrameHost* frame_host = web_contents()->GetMainFrame();
-  mojo::AssociatedRemote<mojom::ElectronRenderer> electron_renderer;
-  frame_host->GetRemoteAssociatedInterfaces()->GetInterface(&electron_renderer);
-  electron_renderer->ReceivePostMessage(channel,
-                                        std::move(transferable_message));
 }
 
 void WebContents::MessageSync(
@@ -2521,9 +2517,8 @@ void WebContents::Print(gin::Arguments* args) {
     settings.SetIntKey(printing::kSettingDpiVertical, dpi);
   }
 
-  base::ThreadPool::PostTaskAndReplyWithResult(
-      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
-      base::BindOnce(&GetDefaultPrinterAsync),
+  print_task_runner_->PostTaskAndReplyWithResult(
+      FROM_HERE, base::BindOnce(&GetDefaultPrinterAsync),
       base::BindOnce(&WebContents::OnGetDefaultPrinter,
                      weak_factory_.GetWeakPtr(), std::move(settings),
                      std::move(callback), device_name, silent));
@@ -2689,46 +2684,6 @@ bool WebContents::SendIPCMessageWithSender(bool internal,
   mojo::AssociatedRemote<mojom::ElectronRenderer> electron_renderer;
   frame_host->GetRemoteAssociatedInterfaces()->GetInterface(&electron_renderer);
   electron_renderer->Message(internal, channel, std::move(args), sender_id);
-  return true;
-}
-
-bool WebContents::SendIPCMessageToFrame(bool internal,
-                                        v8::Local<v8::Value> frame,
-                                        const std::string& channel,
-                                        v8::Local<v8::Value> args) {
-  v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();
-  blink::CloneableMessage message;
-  if (!gin::ConvertFromV8(isolate, args, &message)) {
-    isolate->ThrowException(v8::Exception::Error(
-        gin::StringToV8(isolate, "Failed to serialize arguments")));
-    return false;
-  }
-  int32_t frame_id;
-  int32_t process_id;
-  if (gin::ConvertFromV8(isolate, frame, &frame_id)) {
-    process_id = web_contents()->GetMainFrame()->GetProcess()->GetID();
-  } else {
-    std::vector<int32_t> id_pair;
-    if (gin::ConvertFromV8(isolate, frame, &id_pair) && id_pair.size() == 2) {
-      process_id = id_pair[0];
-      frame_id = id_pair[1];
-    } else {
-      isolate->ThrowException(v8::Exception::Error(gin::StringToV8(
-          isolate,
-          "frameId must be a number or a pair of [processId, frameId]")));
-      return false;
-    }
-  }
-
-  auto* rfh = content::RenderFrameHost::FromID(process_id, frame_id);
-  if (!rfh || !rfh->IsRenderFrameLive() ||
-      content::WebContents::FromRenderFrameHost(rfh) != web_contents())
-    return false;
-
-  mojo::AssociatedRemote<mojom::ElectronRenderer> electron_renderer;
-  rfh->GetRemoteAssociatedInterfaces()->GetInterface(&electron_renderer);
-  electron_renderer->Message(internal, channel, std::move(message),
-                             0 /* sender_id */);
   return true;
 }
 
@@ -3635,8 +3590,6 @@ v8::Local<v8::ObjectTemplate> WebContents::FillObjectTemplate(
       .SetMethod("focus", &WebContents::Focus)
       .SetMethod("isFocused", &WebContents::IsFocused)
       .SetMethod("_send", &WebContents::SendIPCMessage)
-      .SetMethod("_postMessage", &WebContents::PostMessage)
-      .SetMethod("_sendToFrame", &WebContents::SendIPCMessageToFrame)
       .SetMethod("sendInputEvent", &WebContents::SendInputEvent)
       .SetMethod("beginFrameSubscription", &WebContents::BeginFrameSubscription)
       .SetMethod("endFrameSubscription", &WebContents::EndFrameSubscription)
