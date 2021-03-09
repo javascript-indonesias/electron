@@ -6,7 +6,7 @@ import { AddressInfo } from 'net';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as WebSocket from 'ws';
-import { emittedOnce, emittedNTimes } from './events-helpers';
+import { emittedOnce, emittedNTimes, emittedUntil } from './events-helpers';
 
 const uuid = require('uuid');
 
@@ -150,17 +150,17 @@ describe('chrome extensions', () => {
     const loadedPromise = emittedOnce(customSession, 'extension-loaded');
     const extension = await customSession.loadExtension(path.join(fixtures, 'extensions', 'red-bg'));
     const [, loadedExtension] = await loadedPromise;
-    const [, readyExtension] = await emittedOnce(customSession, 'extension-ready');
+    const [, readyExtension] = await emittedUntil(customSession, 'extension-ready', (event: Event, extension: Extension) => {
+      return extension.name !== 'Chromium PDF Viewer';
+    });
 
-    // Compare JSON string to print more information if failed.
-    const expected = JSON.stringify(extension);
-    expect(JSON.stringify(loadedExtension)).to.equal(expected);
-    expect(JSON.stringify(readyExtension)).to.equal(expected);
+    expect(loadedExtension).to.deep.equal(extension);
+    expect(readyExtension).to.deep.equal(extension);
 
     const unloadedPromise = emittedOnce(customSession, 'extension-unloaded');
     await customSession.removeExtension(extension.id);
     const [, unloadedExtension] = await unloadedPromise;
-    expect(JSON.stringify(unloadedExtension)).to.equal(expected);
+    expect(unloadedExtension).to.deep.equal(extension);
   });
 
   it('lists loaded extensions in getAllExtensions', async () => {
